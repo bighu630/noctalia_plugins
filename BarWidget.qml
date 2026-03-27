@@ -25,7 +25,7 @@ Item {
     readonly property string textColorKey:    cfg.textColor       ?? defaults.textColor       ?? "none"
     readonly property color  textColor:       Color.resolveColorKey(textColorKey)
     readonly property string fontFamily:      cfg.fontFamily      ?? defaults.fontFamily      ?? ""
-    readonly property int    maxWidth:        parseInt(cfg.maxWidth ?? defaults.maxWidth ?? 0)
+    readonly property int    maxWidth:        parseInt(cfg.maxWidth ?? defaults.maxWidth ?? 30)
 
     // ── Screen / style helpers ─────────────────────────────────────────────
     readonly property string screenName:    screen ? screen.name : ""
@@ -35,11 +35,23 @@ Item {
     // ── Displayed text (updated on every successful file load) ─────────────
     property string displayText: ""
 
-    // ── Widget geometry ────────────────────────────────────────────────────
-    readonly property real rawContentWidth: textDisplay.implicitWidth + Style.marginM * 2
-    readonly property real cappedWidth:     maxWidth > 0 ? Math.min(rawContentWidth, maxWidth) : rawContentWidth
+    // ── Scroll logic ───────────────────────────────────────────────────────
+    readonly property bool shouldScroll: maxWidth > 0 && displayText.length > maxWidth
 
-    implicitWidth:  Math.max(cappedWidth, capsuleHeight)
+    // Measure pixel width of the first maxWidth characters to size the visible window
+    TextMetrics {
+        id: maxWidthMetrics
+        font.pointSize: root.barFontSize
+        font.family:    root.fontFamily !== "" ? root.fontFamily : font.family
+        text: root.shouldScroll ? root.displayText.substring(0, root.maxWidth) : ""
+    }
+
+    readonly property real contentContainerWidth: root.shouldScroll
+        ? maxWidthMetrics.advanceWidth
+        : textDisplay.implicitWidth
+
+    // ── Widget geometry ────────────────────────────────────────────────────
+    implicitWidth:  Math.max(contentContainerWidth + Style.marginM * 2, capsuleHeight)
     implicitHeight: capsuleHeight
 
     // ── File reader ────────────────────────────────────────────────────────
@@ -78,6 +90,15 @@ Item {
             root.displayText = ""
     }
 
+    // Reset and restart scroll animation when text changes
+    onDisplayTextChanged: {
+        textDisplay.x = 0
+        if (root.shouldScroll)
+            scrollAnimation.restart()
+        else
+            scrollAnimation.stop()
+    }
+
     // ── Visual capsule ─────────────────────────────────────────────────────
     Rectangle {
         id: capsule
@@ -89,23 +110,49 @@ Item {
         radius: Style.radiusL
         border.color: Style.capsuleBorderColor
         border.width: Style.capsuleBorderWidth
-        clip:   root.maxWidth > 0
+        clip: true
 
-        NText {
-            id: textDisplay
+        Item {
+            id: scrollContainer
             anchors.centerIn: parent
-            // When maxWidth is set keep text within bounds (with padding)
-            width:  root.maxWidth > 0 ? root.maxWidth - Style.marginM * 2 : implicitWidth
-            elide:  root.maxWidth > 0 ? Text.ElideRight : Text.ElideNone
-            clip:   false
+            width:  root.contentContainerWidth
+            height: parent.height
 
-            color:       root.textColor
-            pointSize:   root.barFontSize
-            font.family: root.fontFamily !== "" ? root.fontFamily : font.family
-            text: {
-                if (root.filePath === "") return pluginApi?.tr("widget.noFile") ?? "No file"
-                if (root.displayText === "") return "…"
-                return root.displayText
+            NText {
+                id: textDisplay
+                anchors.verticalCenter: parent.verticalCenter
+                x: 0
+
+                color:       root.textColor
+                pointSize:   root.barFontSize
+                font.family: root.fontFamily !== "" ? root.fontFamily : font.family
+                text: {
+                    if (root.filePath === "") return pluginApi?.tr("widget.noFile") ?? "No file"
+                    if (root.displayText === "") return "…"
+                    return root.displayText
+                }
+
+                SequentialAnimation {
+                    id: scrollAnimation
+                    running: root.shouldScroll && root.displayText !== ""
+                    loops: Animation.Infinite
+
+                    PauseAnimation { duration: 1500 }
+                    NumberAnimation {
+                        target:   textDisplay
+                        property: "x"
+                        from: 0
+                        to:   -(textDisplay.implicitWidth - root.contentContainerWidth)
+                        duration: Math.max(0, textDisplay.implicitWidth - root.contentContainerWidth) * 15
+                        easing.type: Easing.Linear
+                    }
+                    PauseAnimation { duration: 1500 }
+                    PropertyAction {
+                        target:   textDisplay
+                        property: "x"
+                        value:    0
+                    }
+                }
             }
         }
     }

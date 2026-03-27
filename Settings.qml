@@ -95,9 +95,9 @@ ColumnLayout {
 
         NTextInput {
             Layout.fillWidth: true
-            label:           pluginApi?.tr("settings.maxWidth.label")       ?? "Max Width (px)"
-            description:     pluginApi?.tr("settings.maxWidth.desc")        ?? "Maximum capsule width in pixels. Set to 0 for no limit."
-            placeholderText: "0"
+            label:           pluginApi?.tr("settings.maxWidth.label")       ?? "Max Width (chars)"
+            description:     pluginApi?.tr("settings.maxWidth.desc")        ?? "Maximum string length in characters. Text longer than this will scroll. Set to 0 for no limit."
+            placeholderText: "30"
             text:            root.valueMaxWidth.toString()
             inputMethodHints: Qt.ImhDigitsOnly
             onTextChanged: {

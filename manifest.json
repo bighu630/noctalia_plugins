@@ -3,7 +3,7 @@
   "name": "Text Sync",
   "version": "1.0.0",
   "minNoctaliaVersion": "4.4.4",
-  "author": "User",
+  "author": "IVHU",
   "license": "MIT",
   "repository": "",
   "description": "Displays text from a file in the status bar with configurable refresh rate, font, color, and max width.",
@@ -24,7 +24,7 @@
       "refreshInterval": 1000,
       "textColor": "none",
       "fontFamily": "",
-      "maxWidth": 0
+      "maxWidth": 30
     }
   }
 }
