@@ -19,7 +19,7 @@
     {
       "id": "nc-screen-recorder",
       "name": "Screen Recorder 2",
-      "version": "1.0.1",
+      "version": "1.0.2",
       "official": false,
       "author": "Bighu630",
       "description": "Screen recording plugin powered by gpu-screen-recorder with audio, quality presets, and portal-based region selection.",

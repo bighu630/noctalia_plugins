@@ -1,22 +1,22 @@
 {
-  "isRecording": false,
   "audioSource": "desktop",
-  "selectedMonitor": "eDP-1",
+  "selectedMonitor": "",
   "videoFormat": "mp4",
   "codec": "auto",
   "quality": "high",
-  "framerate": "30",
+  "framerate": "60",
   "saveDirectory": "~/视频",
   "filePattern": "recording_{datetime}",
   "recordingFile": "",
-  "recordingStartTime": 0,
-  "lastRecordingFile": "/home/ivhu/视频/recording_2026-03-31_23-42-53.mp4",
+  "lastRecordingFile": "/home/ivhu/视频/recording_2026-04-01_20-43-18.mp4",
   "streamDestinations": {
     "BILIBILI": "rtmp://live-push.bilivideo.com/live-bvc/?streamname=live_438476132_37710181&key=a78f7ffff146e409bdc9ec332345261b&schedule=rtmp&pflag=13"
   },
-  "streamDestination": "BILIBILI",
+  "streamDestination": "",
   "selectedRegion": "",
   "bitrate": "5 MB",
   "recordAudio": false,
-  "recordingTarget": "monitor"
+  "recordingTarget": "monitor",
+  "isRecording": false,
+  "recordingStartTime": 0
 }
