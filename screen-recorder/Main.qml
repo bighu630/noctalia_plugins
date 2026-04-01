@@ -116,11 +116,15 @@ Item {
     var file = buildFilename();
     var cmd = "gpu-screen-recorder";
 
+    // Stream destination or file output
+    var streamDestination = cfg.streamDestination || "";
+    var destinations = cfg.streamDestinations || {};
+    var streamUrl = streamDestination ? (destinations[streamDestination] || "") : "";
     if (streamUrl) {
       // Streaming mode
       cmd += " -o '" + streamUrl + "'";
       pluginApi.pluginSettings.recordingFile = "";
-      cfg.codec = "flv"
+      cmd += " -c flv"
     } else {
       // File recording mode
       cmd += " -o '" + file + "'";
@@ -161,10 +165,6 @@ Item {
       cmd += " -q " + cfg.quality;
     }
 
-    // Stream destination or file output
-    var streamDestination = cfg.streamDestination || "";
-    var destinations = cfg.streamDestinations || {};
-    var streamUrl = streamDestination ? (destinations[streamDestination] || "") : "";
 
 
     console.log("gpu-screen-recorder:", cmd);

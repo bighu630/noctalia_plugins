@@ -4,7 +4,7 @@
     {
       "id": "text-sync",
       "name": "Text Sync",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "official": false,
       "author": "Bighu630",
       "description": "Displays text from a file in the status bar with configurable refresh rate, font, color, and max width.",
