@@ -17,7 +17,7 @@
       "lastUpdated": "2026-03-31T23:08:01-07:00"
     },
     {
-      "id": "screen-recorder",
+      "id": "nc-screen-recorder",
       "name": "Screen Recorder",
       "version": "1.0.1",
       "official": false,
