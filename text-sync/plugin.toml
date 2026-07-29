@@ -1,0 +1,58 @@
+id = "bighu630/text-sync"
+name = "Text Sync"
+version = "2.0.0"
+plugin_api = 15
+author = "Bighu630"
+license = "MIT"
+description = "Displays text from a file in the status bar with configurable refresh rate, font, color, and max width."
+tags = ["bar", "utility"]
+
+[[widget]]
+id = "text_sync"
+entry = "widget.luau"
+
+  [[widget.setting]]
+  key = "file_path"
+  type = "file"
+  label_key = "settings.file_path.label"
+  description_key = "settings.file_path.description"
+  default = ""
+
+  [[widget.setting]]
+  key = "refresh_interval"
+  type = "int"
+  label_key = "settings.refresh_interval.label"
+  description_key = "settings.refresh_interval.description"
+  default = 1000
+  min = 100
+
+  [[widget.setting]]
+  key = "text_color"
+  type = "select"
+  label_key = "settings.text_color.label"
+  description_key = "settings.text_color.description"
+  default = "none"
+  options = [
+    { value = "none", label_key = "color.none" },
+    { value = "primary", label_key = "color.primary" },
+    { value = "secondary", label_key = "color.secondary" },
+    { value = "tertiary", label_key = "color.tertiary" },
+    { value = "error", label_key = "color.error" },
+    { value = "on_surface", label_key = "color.on_surface" },
+    { value = "on_surface_variant", label_key = "color.on_surface_variant" }
+  ]
+
+  [[widget.setting]]
+  key = "font_family"
+  type = "string"
+  label_key = "settings.font_family.label"
+  description_key = "settings.font_family.description"
+  default = ""
+
+  [[widget.setting]]
+  key = "max_chars"
+  type = "int"
+  label_key = "settings.max_chars.label"
+  description_key = "settings.max_chars.description"
+  default = 30
+  min = 0

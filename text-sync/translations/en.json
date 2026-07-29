@@ -1,0 +1,20 @@
+{
+  "widget.no_file": "No file",
+  "settings.file_path.label": "File Path",
+  "settings.file_path.description": "Absolute path of the file to read",
+  "settings.refresh_interval.label": "Refresh Interval (ms)",
+  "settings.refresh_interval.description": "How often to re-read the file. Minimum 100 ms.",
+  "settings.text_color.label": "Text Color",
+  "settings.text_color.description": "Color of the displayed text",
+  "settings.font_family.label": "Font Family",
+  "settings.font_family.description": "Font family name (leave empty to use the bar default)",
+  "settings.max_chars.label": "Max Characters",
+  "settings.max_chars.description": "Maximum number of characters to display. Text longer than this will be truncated with an ellipsis. Set to 0 for no limit.",
+  "color.none": "None (Default)",
+  "color.primary": "Primary",
+  "color.secondary": "Secondary",
+  "color.tertiary": "Tertiary",
+  "color.error": "Error",
+  "color.on_surface": "On Surface",
+  "color.on_surface_variant": "On Surface Variant"
+}

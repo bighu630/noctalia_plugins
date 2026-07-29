@@ -1,0 +1,20 @@
+{
+  "widget.no_file": "未选择文件",
+  "settings.file_path.label": "文件路径",
+  "settings.file_path.description": "要读取的文件的绝对路径",
+  "settings.refresh_interval.label": "刷新间隔（毫秒）",
+  "settings.refresh_interval.description": "重新读取文件的频率。最小 100 毫秒。",
+  "settings.text_color.label": "文本颜色",
+  "settings.text_color.description": "显示文本的颜色",
+  "settings.font_family.label": "字体",
+  "settings.font_family.description": "字体名称（留空则使用状态栏默认字体）",
+  "settings.max_chars.label": "最大字符数",
+  "settings.max_chars.description": "最大显示字符数。超过此长度的文本将被截断并显示省略号。设为 0 表示不限制。",
+  "color.none": "无（默认）",
+  "color.primary": "主色",
+  "color.secondary": "次要色",
+  "color.tertiary": "第三色",
+  "color.error": "错误色",
+  "color.on_surface": "表面色",
+  "color.on_surface_variant": "表面变体色"
+}
