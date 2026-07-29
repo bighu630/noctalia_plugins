@@ -2,19 +2,20 @@
   "version": 1,
   "plugins": [
     {
-      "id": "text-sync",
+      "id": "bighu630/text-sync",
       "name": "Text Sync",
-      "version": "1.0.1",
+      "version": "2.0.0",
       "official": false,
       "author": "Bighu630",
       "description": "Displays text from a file in the status bar with configurable refresh rate, font, color, and max width.",
       "repository": "https://github.com/bighu630/noctalia_plugins",
       "license": "MIT",
+      "plugin_api": 15,
       "tags": [
         "Bar",
         "Utility"
       ],
-      "lastUpdated": "2026-03-31T23:08:01-07:00"
+      "lastUpdated": "2026-03-28T22:30:39+08:00"
     },
     {
       "id": "nc-screen-recorder",
