@@ -67,6 +67,4 @@ function update()
   render()
 end
 
-function onRightClick()
-  noctalia.openSettings()
-end
+-- Right-click: middle-click is built-in to open settings (no API call needed)

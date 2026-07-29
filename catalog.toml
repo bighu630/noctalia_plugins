@@ -11,5 +11,5 @@ added_at = 1785285039
 author = "Bighu630"
 license = "MIT"
 description = "Displays text from a file in the status bar with configurable refresh rate, font, color, and max width."
-plugin_api = 15
+plugin_api = 14
 tags = ["bar", "utility"]
