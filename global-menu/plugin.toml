@@ -1,0 +1,23 @@
+id = "bighu630/global-menu"
+name = "Global Menu"
+version = "0.1.0"
+plugin_api = 14
+author = "Bighu630"
+license = "MIT"
+description = "macOS-style global menu for GTK3 apps on niri via an AT-SPI bridge."
+tags = ["bar", "utility"]
+
+[[service]]
+id = "global_menu_service"
+entry = "service.luau"
+
+[[widget]]
+id = "global_menu"
+entry = "widget.luau"
+
+[[panel]]
+id = "global_menu_popup"
+entry = "popup.luau"
+placement = "floating"
+dismiss_on_outside_click = true
+keyboard_focus = "on_demand"
