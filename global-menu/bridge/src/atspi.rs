@@ -362,3 +362,94 @@ fn build_item(node: &RawNode, path: Vec<u32>, ids: &mut u32) -> crate::protocol:
 }
 
 pub type SharedAtspi = Arc<AtspiClient>;
+
+// ── 点击侧 ─────────────────────────────────────────────────────
+
+/// 按 child-index 链定位节点（相对 menubar 根；索引为**全部子节点**索引，
+/// 与 build_menu_tree 的 path 语义一致）。
+pub fn locate_by_path<'a>(root: &'a RawNode, path: &[u32]) -> Option<&'a RawNode> {
+    let mut cur = root;
+    for &i in path {
+        cur = cur.children.get(i as usize)?;
+    }
+    Some(cur)
+}
+
+impl AtspiClient {
+    /// 重新执行完整解析（pid → app → frame → menubar → RawNode），按 path 定位，
+    /// 再对目标做 DoAction。返回 (是否找到, 是否执行成功)。
+    pub fn click_path(&self, pid: u32, title: &str, path: &[u32]) -> Result<(bool, bool)> {
+        let Some(app) = self.find_app_for_pid(pid)? else { return Ok((false, false)) };
+        let scope = match self.choose_frame(&app, title)? {
+            Some(frame) => frame,
+            None => app,
+        };
+        let Some(menubar) = self.find_menubar(&scope)? else { return Ok((false, false)) };
+        let Some(root) = self.read_node(&menubar, 0) else { return Ok((false, false)) };
+        let Some(target) = locate_by_path(&root, path) else { return Ok((false, false)) };
+        let Some(acc) = &target.acc else { return Ok((false, false)) };
+        let ok = self.do_action(acc)?;
+        Ok((true, ok))
+    }
+
+    /// 重新解析并按 path 读取节点直接子项（懒构建兜底，/open 用）。
+    /// 返回 (找到, 子树 RawNode 的 children)。
+    pub fn read_children_by_path(
+        &self,
+        pid: u32,
+        title: &str,
+        path: &[u32],
+    ) -> Result<(bool, Vec<RawNode>)> {
+        let Some(app) = self.find_app_for_pid(pid)? else { return Ok((false, vec![])) };
+        let scope = match self.choose_frame(&app, title)? {
+            Some(frame) => frame,
+            None => app,
+        };
+        let Some(menubar) = self.find_menubar(&scope)? else { return Ok((false, vec![])) };
+        let Some(root) = self.read_node(&menubar, 0) else { return Ok((false, vec![])) };
+        let Some(target) = locate_by_path(&root, path) else { return Ok((false, vec![])) };
+        let Some(acc) = &target.acc else { return Ok((false, vec![])) };
+        // 子项按 RawNode 读取（与主树 children 同形）；深度 = 目标深度 + 1。
+        let depth = path.len() + 1;
+        let children = self
+            .children(acc)
+            .into_iter()
+            .filter_map(|c| self.read_node(&c, depth))
+            .collect();
+        Ok((true, children))
+    }
+
+    /// AT-SPI Action 接口点击。qatspi 约定索引 0 = "click"；
+    /// 兜底：枚举动作名匹配 "click"，否则尝试 0。返回执行结果。
+    fn do_action(&self, acc: &AccessibleRef) -> Result<bool> {
+        let count: i32 = self
+            .conn
+            .call_method(Some(acc.bus.as_str()), acc.path.as_str(), Some("org.a11y.atspi.Action"), "GetActionCount", &())?
+            .body()
+            .deserialize()?;
+        if count <= 0 {
+            return Ok(false);
+        }
+        let mut idx = -1i32;
+        for i in 0..count {
+            let name: String = self
+                .conn
+                .call_method(Some(acc.bus.as_str()), acc.path.as_str(), Some("org.a11y.atspi.Action"), "GetActionName", &(i,))?
+                .body()
+                .deserialize()?;
+            if name.to_ascii_lowercase().contains("click") {
+                idx = i;
+                break;
+            }
+        }
+        if idx < 0 {
+            idx = 0;
+        }
+        let ok: bool = self
+            .conn
+            .call_method(Some(acc.bus.as_str()), acc.path.as_str(), Some("org.a11y.atspi.Action"), "DoAction", &(idx,))?
+            .body()
+            .deserialize()?;
+        Ok(ok)
+    }
+}
