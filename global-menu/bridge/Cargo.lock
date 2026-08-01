@@ -502,6 +502,7 @@ name = "noctalia-global-menu-bridge"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "enumflags2",
  "serde",
  "serde_json",
  "tiny_http",
