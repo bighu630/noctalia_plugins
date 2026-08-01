@@ -97,7 +97,12 @@ fn run() -> Result<()> {
                 pending_focus = Some(id);
                 debounce_deadline = Some(std::time::Instant::now() + Duration::from_millis(DEBOUNCE_MS));
             }
-            Ok(Ctrl::Windows(w)) => window_cache = w,
+            Ok(Ctrl::Windows(w)) => {
+                window_cache = w;
+                if let Some(f) = current_focus(&window_cache) {
+                    shared.lock().unwrap().focus = Some(f);
+                }
+            }
             Ok(Ctrl::Refresh) => {
                 // 立即按当前焦点重解析
                 if let Some(focus) = current_focus(&window_cache) {
@@ -154,6 +159,12 @@ fn handle_focus(
     shared: &Arc<Mutex<Shared>>,
     focus: FocusInfo,
 ) -> Result<()> {
+    // 先更新当前焦点（解析全树耗时数秒，HTTP /click /open 必须尽早拿到新焦点，
+    // 否则解析期间请求会命中过期 session——实测竞态）。
+    {
+        let mut st = shared.lock().unwrap();
+        st.focus = Some(focus.clone());
+    }
     let menu = match resolve_focus(atspi, &focus) {
         Ok(m) => m,
         Err(e) => {

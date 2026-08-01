@@ -85,6 +85,10 @@ use std::sync::{Arc, Mutex};
 /// 跨线程共享状态（proxy 主循环写，HTTP 线程读）。
 #[derive(Default)]
 pub struct Shared {
+    /// 当前焦点窗口（主循环在 WindowsChanged/焦点处理时持续更新）。
+    /// HTTP 线程点击/展开用它而非 session：菜单全树解析耗时数秒，
+    /// 期间 session 可能还是旧焦点（实测竞态）。
+    pub focus: Option<FocusInfo>,
     pub session: Option<Session>,
 }
 

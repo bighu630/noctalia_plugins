@@ -26,7 +26,6 @@ pub const STATE_SHOWING: u32 = 25;
 
 const IFACE_ACCESSIBLE: &str = "org.a11y.atspi.Accessible";
 const IFACE_REGISTRY: &str = "org.a11y.atspi.Registry";
-const REGISTRY_PATH: &str = "/org/a11y/atspi/registry";
 const A11Y_SERVICE: &str = "org.a11y.Bus";
 const A11Y_PATH: &str = "/org/a11y/bus";
 const MAX_DEPTH: usize = 8;
@@ -79,11 +78,29 @@ impl AtspiClient {
     }
 
     fn get_name(&self, acc: &AccessibleRef) -> Result<String> {
-        Ok(self
+        // 兼容两种 ATK 桥：标准实现提供 GetName 方法；
+        // 实测（GIMP 3.2 环境）GetName 缺失但 Name 属性可用。
+        if let Ok(r) = self
             .conn
-            .call_method(Some(acc.bus.as_str()), acc.path.as_str(), Some(IFACE_ACCESSIBLE), "GetName", &())?
+            .call_method(Some(acc.bus.as_str()), acc.path.as_str(), Some(IFACE_ACCESSIBLE), "GetName", &())
+        {
+            if let Ok(name) = r.body().deserialize::<String>() {
+                return Ok(name);
+            }
+        }
+        let v = self
+            .conn
+            .call_method(
+                Some(acc.bus.as_str()),
+                acc.path.as_str(),
+                Some("org.freedesktop.DBus.Properties"),
+                "Get",
+                &("org.a11y.atspi.Accessible", "Name"),
+            )?
             .body()
-            .deserialize()?)
+            .deserialize::<zvariant::OwnedValue>()?;
+        let name: String = String::try_from(v).map_err(|_| anyhow!("Name is not string"))?;
+        Ok(name)
     }
 
     /// GetState 的 wire 类型是 `au`（两个 u32 位词，位索引 = AtspiStateType 枚举值）。
@@ -98,11 +115,21 @@ impl AtspiClient {
     }
 
     fn child_count(&self, acc: &AccessibleRef) -> Result<i32> {
-        Ok(self
+        // 实测：部分 at-spi2-registryd / ATK 实现不提供 GetChildCount 方法，
+        // 但 ChildCount 属性通用存在（参考实现 noctalia-appmenu 同款路径）。
+        let v = self
             .conn
-            .call_method(Some(acc.bus.as_str()), acc.path.as_str(), Some(IFACE_ACCESSIBLE), "GetChildCount", &())?
+            .call_method(
+                Some(acc.bus.as_str()),
+                acc.path.as_str(),
+                Some("org.freedesktop.DBus.Properties"),
+                "Get",
+                &("org.a11y.atspi.Accessible", "ChildCount"),
+            )?
             .body()
-            .deserialize()?)
+            .deserialize::<zvariant::OwnedValue>()?;
+        let v: i32 = i32::try_from(v).map_err(|_| anyhow!("ChildCount is not int32"))?;
+        Ok(v)
     }
 
     fn child_at(&self, acc: &AccessibleRef, i: i32) -> Result<Option<AccessibleRef>> {
@@ -158,26 +185,31 @@ impl AtspiClient {
     // ── 应用定位 ────────────────────────────────────────────────
 
     /// a11y 总线上所有注册应用（bus name, root accessible path）。
+    /// 经 registry root accessible（/org/a11y/atspi/accessible/root）的 children
+    /// 枚举；GetRegisteredApplications 在部分 registryd 缺失，root children
+    /// 是通用路径（参考实现 noctalia-appmenu 同款）。
+    /// null 哨兵（org.a11y.atspi.Registry + /org/a11y/atspi/null）过滤掉。
     fn registered_applications(&self) -> Result<Vec<(String, OwnedObjectPath)>> {
+        let root = AccessibleRef {
+            bus: IFACE_REGISTRY.to_string(),
+            path: OwnedObjectPath::try_from("/org/a11y/atspi/accessible/root")?,
+        };
         Ok(self
-            .conn
-            .call_method(
-                Some("org.a11y.atspi.Registry"),
-                REGISTRY_PATH,
-                Some(IFACE_REGISTRY),
-                "GetRegisteredApplications",
-                &(),
-            )?
-            .body()
-            .deserialize()?)
+            .children(&root)
+            .into_iter()
+            .filter(|c| c.path.as_str() != "/org/a11y/atspi/null")
+            .map(|c| (c.bus, c.path))
+            .collect())
     }
 
     /// a11y 总线连接 → PID（与会话总线的 GetConnectionUnixProcessID 不同，a11y 总线是独立 daemon）。
     fn pid_of(&self, bus_name: &str) -> Result<u32> {
+        // 显式 destination：实测 dbus-broker 拒绝无 destination 头的 method call
+        // （zbus destination=None 不设头，规范允许但 dbus-broker 实现报 Invalid method call）。
         Ok(self
             .conn
             .call_method(
-                None::<&str>,
+                Some("org.freedesktop.DBus"),
                 "/org/freedesktop/DBus",
                 Some("org.freedesktop.DBus"),
                 "GetConnectionUnixProcessID",
@@ -422,11 +454,30 @@ impl AtspiClient {
     /// AT-SPI Action 接口点击。qatspi 约定索引 0 = "click"；
     /// 兜底：枚举动作名匹配 "click"，否则尝试 0。返回执行结果。
     fn do_action(&self, acc: &AccessibleRef) -> Result<bool> {
+        // 兼容两种 ATK 桥：标准 at-spi2 提供 GetActionCount/GetActionName 方法；
+        // 实测（GIMP 3.2 环境）二者缺失，但 NActions 属性 + GetName(i)（qspi 风格）可用。
         let count: i32 = self
             .conn
-            .call_method(Some(acc.bus.as_str()), acc.path.as_str(), Some("org.a11y.atspi.Action"), "GetActionCount", &())?
-            .body()
-            .deserialize()?;
+            .call_method(Some(acc.bus.as_str()), acc.path.as_str(), Some("org.a11y.atspi.Action"), "GetActionCount", &())
+            .ok()
+            .and_then(|r| r.body().deserialize::<i32>().ok())
+            .unwrap_or(0);
+        let count = if count > 0 {
+            count
+        } else {
+            let v = self
+                .conn
+                .call_method(
+                    Some(acc.bus.as_str()),
+                    acc.path.as_str(),
+                    Some("org.freedesktop.DBus.Properties"),
+                    "Get",
+                    &("org.a11y.atspi.Action", "NActions"),
+                )?
+                .body()
+                .deserialize::<zvariant::OwnedValue>()?;
+            i32::try_from(v).unwrap_or(0)
+        };
         if count <= 0 {
             return Ok(false);
         }
@@ -434,9 +485,16 @@ impl AtspiClient {
         for i in 0..count {
             let name: String = self
                 .conn
-                .call_method(Some(acc.bus.as_str()), acc.path.as_str(), Some("org.a11y.atspi.Action"), "GetActionName", &(i,))?
-                .body()
-                .deserialize()?;
+                .call_method(Some(acc.bus.as_str()), acc.path.as_str(), Some("org.a11y.atspi.Action"), "GetActionName", &(i,))
+                .ok()
+                .and_then(|r| r.body().deserialize::<String>().ok())
+                .or_else(|| {
+                    self.conn
+                        .call_method(Some(acc.bus.as_str()), acc.path.as_str(), Some("org.a11y.atspi.Action"), "GetName", &(i,))
+                        .ok()
+                        .and_then(|r| r.body().deserialize::<String>().ok())
+                })
+                .unwrap_or_default();
             if name.to_ascii_lowercase().contains("click") {
                 idx = i;
                 break;

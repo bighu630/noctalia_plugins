@@ -75,11 +75,11 @@ fn handle(
 
         (_, "/click") => {
             let st = shared.lock().unwrap();
-            let Some(session) = &st.session else {
+            let Some(focus) = st.focus.clone().or_else(|| st.session.as_ref().map(|s| s.focus.clone())) else {
                 return json(200, serde_json::json!({"ok": false, "error": "no session"}));
             };
             match serde_json::from_str::<PathBody>(&body) {
-                Ok(b) => match click_path(&atspi, &session.focus, &b.path) {
+                Ok(b) => match click_path(&atspi, &focus, &b.path) {
                     Ok((found, clicked)) => serde_json::json!({"ok": found && clicked, "found": found, "clicked": clicked}),
                     Err(e) => serde_json::json!({"ok": false, "error": format!("{e:#}")}),
                 },
@@ -89,11 +89,11 @@ fn handle(
 
         (_, "/open") => {
             let st = shared.lock().unwrap();
-            let Some(session) = &st.session else {
+            let Some(focus) = st.focus.clone().or_else(|| st.session.as_ref().map(|s| s.focus.clone())) else {
                 return json(200, serde_json::json!({"ok": false, "error": "no session"}));
             };
             match serde_json::from_str::<PathBody>(&body) {
-                Ok(b) => match open_path(&atspi, &session.focus, &b.path) {
+                Ok(b) => match open_path(&atspi, &focus, &b.path) {
                     Ok((found, items)) => {
                         if found {
                             serde_json::to_value(build_children_response(true, items)).unwrap()
