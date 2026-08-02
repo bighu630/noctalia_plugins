@@ -7,6 +7,13 @@ pub struct StdoutSink {
     lock: Mutex<()>,
 }
 
+impl Clone for StdoutSink {
+    // 每行 emit 内部经 std::io::stdout() 的共享锁串行化，多份 sink 实例安全。
+    fn clone(&self) -> Self {
+        Self::new()
+    }
+}
+
 impl StdoutSink {
     pub fn new() -> Self {
         Self { lock: Mutex::new(()) }

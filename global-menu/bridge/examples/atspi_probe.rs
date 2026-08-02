@@ -9,10 +9,25 @@ fn main() {
         Ok(Some(app)) => {
             println!("app found: {} {}", app.bus, app.path);
             match c.choose_frame(&app, &title) {
-                Ok(scope) => println!("choose_frame -> {:?}", scope),
+                Ok(noctalia_global_menu_bridge::atspi::FrameChoice::SingleWindow) => {
+                    println!("choose_frame -> SingleWindow (app root)");
+                }
+                Ok(noctalia_global_menu_bridge::atspi::FrameChoice::Matched(frame)) => {
+                    println!("choose_frame -> Matched {} {}", frame.bus, frame.path);
+                }
+                Ok(noctalia_global_menu_bridge::atspi::FrameChoice::NoMatch) => {
+                    println!("choose_frame -> NoMatch (多窗口未匹配，放弃)");
+                }
                 Err(e) => println!("choose_frame ERR {e:#}"),
             }
-            let scope = c.choose_frame(&app, &title).ok().flatten().unwrap_or(app.clone());
+            let scope = match c.choose_frame(&app, &title) {
+                Ok(noctalia_global_menu_bridge::atspi::FrameChoice::SingleWindow) => app.clone(),
+                Ok(noctalia_global_menu_bridge::atspi::FrameChoice::Matched(frame)) => frame,
+                _ => {
+                    println!("skip: NoMatch");
+                    return;
+                }
+            };
             match c.find_menubar(&scope) {
                 Ok(Some(mb)) => {
                     println!("menubar found: {} {}", mb.bus, mb.path);

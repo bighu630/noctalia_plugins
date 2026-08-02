@@ -31,6 +31,7 @@ const HEARTBEAT_SECS: u64 = 5;
 
 enum Ctrl {
     FocusChanged(u64),
+    WorkspaceActive(Option<u64>),
     Windows(Vec<NiriWindow>),
     Refresh,
     Quit,
@@ -70,10 +71,13 @@ fn run() -> Result<()> {
     // 3. hello
     sink.emit(&BridgeEvent::Hello { port: http_server.port, pid: std::process::id() });
 
-    // 4. niri 订阅线程
+    // 4. niri 订阅线程（spawn/读流失败 → error 事件上报，插件可见而非静默死亡）
     let focus_tx2 = focus_tx.clone();
+    let sink_niri = sink.clone();
     thread::spawn(move || {
-        let _ = niri_event_loop(focus_tx2);
+        if let Err(e) = niri_event_loop(focus_tx2) {
+            sink_niri.emit(&BridgeEvent::Error { msg: format!("niri event stream failed: {e:#}") });
+        }
     });
 
     // 5. 初始 windows 快照（缓存由事件流维护，这里兜底）
@@ -96,6 +100,24 @@ fn run() -> Result<()> {
             Ok(Ctrl::FocusChanged(id)) => {
                 pending_focus = Some(id);
                 debounce_deadline = Some(std::time::Instant::now() + Duration::from_millis(DEBOUNCE_MS));
+            }
+            Ok(Ctrl::WorkspaceActive(id)) => {
+                // 焦点来源兜底：层表面（launcher 等）抢焦时不发 WindowFocusChanged，
+                // is_focused 全 false 导致菜单停摆；焦点回到窗口时靠
+                // WorkspaceActiveWindowChanged 恢复解析（与 FocusChanged 同一去抖路径）。
+                if let Some(id) = id {
+                    let stale = shared
+                        .lock()
+                        .unwrap()
+                        .session
+                        .as_ref()
+                        .map(|s| s.focus.win_id != id)
+                        .unwrap_or(true);
+                    if stale {
+                        pending_focus = Some(id);
+                        debounce_deadline = Some(std::time::Instant::now() + Duration::from_millis(DEBOUNCE_MS));
+                    }
+                }
             }
             Ok(Ctrl::Windows(w)) => {
                 window_cache = w;
@@ -214,6 +236,10 @@ fn niri_event_loop(tx: Sender<Ctrl>) -> Result<()> {
         match parse_event_line(&line) {
             Ok(NiriEvent::WindowFocusChanged { id }) => {
                 let _ = tx.send(Ctrl::FocusChanged(id));
+            }
+            Ok(NiriEvent::WorkspaceActiveWindowChanged { active_window_id, .. }) => {
+                // 层表面抢焦时焦点事件缺失的兜底来源（主循环按 stale 判定去抖）
+                let _ = tx.send(Ctrl::WorkspaceActive(active_window_id));
             }
             Ok(NiriEvent::WindowsChanged { windows }) => {
                 let _ = tx.send(Ctrl::Windows(windows));

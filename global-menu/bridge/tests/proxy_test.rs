@@ -1,8 +1,14 @@
-use noctalia_global_menu_bridge::proxy::{FocusInfo, make_menu_event, build_children_response};
-use noctalia_global_menu_bridge::protocol::{AppInfo, MenuItem, MenuItemType};
+use noctalia_global_menu_bridge::atspi::{RawNode, ROLE_MENU, ROLE_MENU_ITEM};
+use noctalia_global_menu_bridge::proxy::{build_children, build_children_response, make_menu_event, FocusInfo};
+use noctalia_global_menu_bridge::protocol::{MenuItem, MenuItemType};
 
 fn item(id: u32, label: &str, item_type: MenuItemType, children: Vec<MenuItem>) -> MenuItem {
     MenuItem { id, label: label.into(), mnemonic: None, item_type, enabled: true, visible: true, checked: false, icon: None, children, path: vec![] }
+}
+
+// 可见性位字面量 1<<30 = ATSPI_STATE_VISIBLE（权威值，防常量回归）
+fn raw_node(role: u32, name: &str, state: (u32, u32), children: Vec<RawNode>) -> RawNode {
+    RawNode { role, name: name.into(), state, children, acc: None }
 }
 
 #[test]
@@ -35,4 +41,37 @@ fn children_response_uses_same_id_space() {
     let v = serde_json::to_value(&resp).unwrap();
     assert_eq!(v["ok"], true);
     assert_eq!(v["children"][0]["id"], 3);
+}
+
+#[test]
+fn open_children_paths_are_parent_plus_raw_index() {
+    // B2 回归锁定：/open 返回的子项 path 必须是 父 path + 原始 child-index。
+    // 曾把父 path 原样传给每个子项 → /click {path:[0]} 定位到 File 菜单本身
+    // 并 DoAction（静默执行错误动作）；点子菜单 → /open 死循环。
+    let raws = vec![
+        raw_node(ROLE_MENU_ITEM, "New", (1 << 30, 0), vec![]),
+        raw_node(ROLE_MENU_ITEM, "Open…", (1 << 30, 0), vec![]),
+        raw_node(ROLE_MENU, "Recent", (0, 0), vec![
+            raw_node(ROLE_MENU_ITEM, "Recent A", (1 << 30, 0), vec![]),
+        ]),
+    ];
+    let items = build_children(&raws, &[0]); // 父 path=[0]（File 菜单）
+    assert_eq!(items.len(), 3);
+    assert_eq!(items[0].path, vec![0, 0]); // New
+    assert_eq!(items[1].path, vec![0, 1]); // Open…
+    assert_eq!(items[2].path, vec![0, 2]); // Recent（子菜单自身）
+    assert_eq!(items[2].children[0].path, vec![0, 2, 0]); // Recent ▸ Recent A
+}
+
+#[test]
+fn open_children_filter_invisible_like_main_tree() {
+    // 与主树可见性策略一致：不可见叶子不出现，但 path 槽位仍是原始 child-index
+    let raws = vec![
+        raw_node(ROLE_MENU_ITEM, "Hidden", (0, 0), vec![]), // 无 VISIBLE 位
+        raw_node(ROLE_MENU_ITEM, "Shown", (1 << 30, 0), vec![]),
+    ];
+    let items = build_children(&raws, &[0]);
+    assert_eq!(items.len(), 1);
+    assert_eq!(items[0].label, "Shown");
+    assert_eq!(items[0].path, vec![0, 1]); // 原始索引 1（Hidden 被过滤但占槽）
 }

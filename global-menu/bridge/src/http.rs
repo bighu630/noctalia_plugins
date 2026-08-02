@@ -5,6 +5,7 @@ use crate::atspi::SharedAtspi;
 use crate::proxy::{build_children_response, click_path, open_path, Shared};
 use anyhow::{anyhow, Result};
 use serde::Deserialize;
+use std::io::Read;
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -42,8 +43,12 @@ pub fn spawn(
             let shared = shared.clone();
             let atspi = atspi.clone();
             let refresh_tx = refresh_tx.clone();
-            let response = handle(&mut request, shared, atspi, refresh_tx);
-            let _ = request.respond(response);
+            // 每请求一线程：/click 全树重解析耗时数秒，不能阻塞 /ping 心跳
+            // 探测（否则插件误判桥死亡而重启）。shared/atspi/refresh_tx 均可 clone。
+            thread::spawn(move || {
+                let response = handle(&mut request, shared, atspi, refresh_tx);
+                let _ = request.respond(response);
+            });
         }
     });
 
@@ -63,8 +68,13 @@ fn handle(
             .with_status_code(code)
             .with_header(tiny_http::Header::from_bytes(&b"Content-Type"[..], &b"application/json"[..]).unwrap())
     };
+    // body 读取上限：防御异常大请求（超出直接 413，不解析）
+    const MAX_BODY_BYTES: u64 = 64 * 1024;
     let mut body = String::new();
-    let _ = request.as_reader().read_to_string(&mut body);
+    let _ = request.as_reader().take(MAX_BODY_BYTES + 1).read_to_string(&mut body);
+    if body.len() as u64 > MAX_BODY_BYTES {
+        return json(413, serde_json::json!({"ok": false, "error": "body too large"}));
+    }
 
     let result: serde_json::Value = match (method, path.as_str()) {
         (_, "/ping") => serde_json::json!({"ok": true}),
@@ -80,7 +90,14 @@ fn handle(
             };
             match serde_json::from_str::<PathBody>(&body) {
                 Ok(b) => match click_path(&atspi, &focus, &b.path) {
-                    Ok((found, clicked)) => serde_json::json!({"ok": found && clicked, "found": found, "clicked": clicked}),
+                    Ok((found, clicked)) => {
+                        let ok = found && clicked;
+                        if ok {
+                            // 点击成功后自动重拉并补发 menu 事件（设计承诺的勾选/禁用状态同步）
+                            let _ = refresh_tx.send(());
+                        }
+                        serde_json::json!({"ok": ok, "found": found, "clicked": clicked})
+                    }
                     Err(e) => serde_json::json!({"ok": false, "error": format!("{e:#}")}),
                 },
                 Err(e) => serde_json::json!({"ok": false, "error": format!("bad body: {e}")}),

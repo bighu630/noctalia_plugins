@@ -16,11 +16,11 @@ pub const ROLE_MENU_BAR: u32 = 34;
 pub const ROLE_MENU_ITEM: u32 = 35;
 pub const ROLE_RADIO_MENU_ITEM: u32 = 45;
 pub const ROLE_SEPARATOR: u32 = 50;
-pub const ROLE_WINDOW: u32 = 15;
+pub const ROLE_WINDOW: u32 = 69; // atspi-constants.h 权威值（15 是 DIAL，曾误用）
 
 pub const STATE_ENABLED: u32 = 8;
 pub const STATE_SENSITIVE: u32 = 24;
-pub const STATE_VISIBLE: u32 = 31;
+pub const STATE_VISIBLE: u32 = 30; // atspi-constants.h 权威值（31 是 MANAGES_DESCENDANTS，曾误用）
 pub const STATE_CHECKED: u32 = 4;
 pub const STATE_SHOWING: u32 = 25;
 
@@ -49,6 +49,17 @@ pub struct RawNode {
 
 pub struct AtspiClient {
     conn: Connection,
+}
+
+/// 多窗口同 PID 的 frame 匹配结果：用 niri 焦点窗口 title 精确匹配（ADR-0030：绝不猜）。
+/// SingleWindow = 只有一个窗口，从 app 根解析；Matched(frame) = 多窗口且 title 命中；
+/// NoMatch = 多窗口但匹配不到 → 上层**直接放弃**，不再回退 app 根 DFS
+/// （回退会显示错误窗口的菜单——多窗口应用曾因此展示错菜单）。
+#[derive(Debug, Clone, PartialEq)]
+pub enum FrameChoice {
+    SingleWindow,
+    Matched(AccessibleRef),
+    NoMatch,
 }
 
 impl AtspiClient {
@@ -230,20 +241,19 @@ impl AtspiClient {
     }
 
     /// 多窗口同 PID：用 niri 焦点窗口 title 精确匹配 frame（ADR-0030：绝不猜）。
-    /// 返回 Some(frame) = 从该 frame 找菜单；None = 从 app 根找；Err 仅网络层错误。
-    pub fn choose_frame(&self, app: &AccessibleRef, title: &str) -> Result<Option<AccessibleRef>> {
+    pub fn choose_frame(&self, app: &AccessibleRef, title: &str) -> Result<FrameChoice> {
         let frames = self.children(app);
         if frames.len() <= 1 {
-            return Ok(None); // 单窗口：app 根
+            return Ok(FrameChoice::SingleWindow); // 单窗口：app 根
         }
         for f in &frames {
             let role = self.get_role(f).unwrap_or(0);
             if (role == ROLE_FRAME || role == ROLE_WINDOW) && self.get_name(f).ok().as_deref() == Some(title) {
-                return Ok(Some(f.clone()));
+                return Ok(FrameChoice::Matched(f.clone()));
             }
         }
-        // 多窗口但匹配不到 → None 且上层判定"无法识别"，回退占位
-        Ok(None)
+        // 多窗口但匹配不到 → NoMatch，上层放弃（绝不猜）
+        Ok(FrameChoice::NoMatch)
     }
 
     /// 从起点 DFS 找 MENU_BAR（深度受限）。
@@ -263,8 +273,9 @@ impl AtspiClient {
     pub fn fetch_menubar(&self, pid: u32, title: &str) -> Result<Option<RawNode>> {
         let Some(app) = self.find_app_for_pid(pid)? else { return Ok(None) };
         let scope = match self.choose_frame(&app, title)? {
-            Some(frame) => frame,
-            None => app,
+            FrameChoice::SingleWindow => app,
+            FrameChoice::Matched(frame) => frame,
+            FrameChoice::NoMatch => return Ok(None), // 多窗口匹配不到：不上报任何菜单
         };
         let Some(menubar) = self.find_menubar(&scope)? else { return Ok(None) };
         Ok(self.read_node(&menubar, 0))
@@ -276,7 +287,8 @@ impl AtspiClient {
 /// 可见性判据：MENU/MENU_BAR 是结构容器，总是保留（关闭的子菜单
 /// VISIBLE/SHOWING 位为 0 也要出现在树里）；叶子项须带 VISIBLE 或
 /// SHOWING 位，否则过滤（不占 id）。
-fn is_visible(node: &RawNode) -> bool {
+/// pub(crate)：/open 路径（proxy::build_children）复用同一策略过滤直接子项。
+pub(crate) fn is_visible(node: &RawNode) -> bool {
     node.role == ROLE_MENU
         || node.role == ROLE_MENU_BAR
         || node.state.0 & (1 << STATE_VISIBLE) != 0
@@ -413,8 +425,9 @@ impl AtspiClient {
     pub fn click_path(&self, pid: u32, title: &str, path: &[u32]) -> Result<(bool, bool)> {
         let Some(app) = self.find_app_for_pid(pid)? else { return Ok((false, false)) };
         let scope = match self.choose_frame(&app, title)? {
-            Some(frame) => frame,
-            None => app,
+            FrameChoice::SingleWindow => app,
+            FrameChoice::Matched(frame) => frame,
+            FrameChoice::NoMatch => return Ok((false, false)), // 绝不猜
         };
         let Some(menubar) = self.find_menubar(&scope)? else { return Ok((false, false)) };
         let Some(root) = self.read_node(&menubar, 0) else { return Ok((false, false)) };
@@ -434,8 +447,9 @@ impl AtspiClient {
     ) -> Result<(bool, Vec<RawNode>)> {
         let Some(app) = self.find_app_for_pid(pid)? else { return Ok((false, vec![])) };
         let scope = match self.choose_frame(&app, title)? {
-            Some(frame) => frame,
-            None => app,
+            FrameChoice::SingleWindow => app,
+            FrameChoice::Matched(frame) => frame,
+            FrameChoice::NoMatch => return Ok((false, vec![])), // 绝不猜
         };
         let Some(menubar) = self.find_menubar(&scope)? else { return Ok((false, vec![])) };
         let Some(root) = self.read_node(&menubar, 0) else { return Ok((false, vec![])) };

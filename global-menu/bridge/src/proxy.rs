@@ -3,8 +3,8 @@
 //! 桥无状态：每次焦点变化/点击/展开都从 niri + AT-SPI 重新解析。
 //! id 语义 = DFS 解析序；path 语义 = 相对 menubar 的 child-index 链（点击/展开提交 path）。
 
-use crate::atspi::{build_menu_tree, AtspiClient};
-use crate::protocol::{AppInfo, BridgeEvent, MenuItem, MenuItemType};
+use crate::atspi::{build_menu_tree, is_visible, AtspiClient, RawNode};
+use crate::protocol::{AppInfo, BridgeEvent, MenuItem};
 use anyhow::Result;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -63,24 +63,35 @@ pub fn click_path(atspi: &AtspiClient, focus: &FocusInfo, path: &[u32]) -> Resul
     atspi.click_path(focus.pid, &focus.title, path)
 }
 
-/// 展开兜底：重解析 + path 定位 + 读子项，转统一模型（id 空间与一次全新解析一致）。
+/// 由目标节点的直接子项 RawNode 列表构建 /open 响应（与主树同形、同 id 空间）。
 /// 子项 path = 父 path + 原始 child-index（点击/再展开可直接提交）。
+/// 独立成纯函数便于单测锁定 path 语义（B2 回归：曾把父 path 原样传给每个子项，
+/// 导致 /click 定位到父项本身、/open 死循环）。
+/// 可见性策略与主树一致：build_item 只过滤"自己的 children"，对传入节点本身
+/// 不做可见性判断，因此这里补上 build_menu_tree 同款的顶层 is_visible 过滤
+/// （不可见项不占 id；i 仍取原始索引，路径槽位与主树一致）。
+pub fn build_children(raws: &[RawNode], parent_path: &[u32]) -> Vec<MenuItem> {
+    let mut ids = 0u32;
+    let mut items = Vec::new();
+    for (i, raw) in raws.iter().enumerate() {
+        if !is_visible(raw) {
+            continue;
+        }
+        let mut p = parent_path.to_vec();
+        p.push(i as u32);
+        items.push(crate::atspi::build_item_pub(raw, &p, &mut ids));
+    }
+    items
+}
+
+/// 展开兜底：重解析 + path 定位 + 读子项，转统一模型（id 空间与一次全新解析一致）。
 pub fn open_path(atspi: &AtspiClient, focus: &FocusInfo, path: &[u32]) -> Result<(bool, Vec<MenuItem>)> {
     let (found, raws) = atspi.read_children_by_path(focus.pid, &focus.title, path)?;
     if !found {
         return Ok((false, vec![]));
     }
-    let mut ids = 0u32;
-    let mut items = Vec::new();
-    for raw in raws {
-        // 每个子项与主树 children 同形：build_item 而非 build_menu_tree（后者是容器）。
-        // 传父 path：子项 path = path + [原始索引]，保证 /click、/open 可直接提交。
-        items.push(crate::atspi::build_item_pub(&raw, path, &mut ids));
-    }
-    Ok((true, items))
+    Ok((true, build_children(&raws, path)))
 }
-
-use std::sync::{Arc, Mutex};
 
 /// 跨线程共享状态（proxy 主循环写，HTTP 线程读）。
 #[derive(Default)]

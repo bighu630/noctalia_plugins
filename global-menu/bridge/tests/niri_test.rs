@@ -39,6 +39,27 @@ fn parses_windows_changed_with_full_window_list() {
 }
 
 #[test]
+fn parses_workspace_active_window_event() {
+    // M2 焦点兜底：层表面抢焦后焦点回到窗口时 niri 发 WorkspaceActiveWindowChanged
+    let line = r#"{"WorkspaceActiveWindowChanged":{"workspace_id":2,"active_window_id":34}}"#;
+    match parse_event_line(line).unwrap() {
+        NiriEvent::WorkspaceActiveWindowChanged { workspace_id, active_window_id } => {
+            assert_eq!(workspace_id, 2);
+            assert_eq!(active_window_id, Some(34));
+        }
+        other => panic!("unexpected: {other:?}"),
+    }
+    // 焦点在层表面（launcher）上时 active_window_id 为 null
+    let line2 = r#"{"WorkspaceActiveWindowChanged":{"workspace_id":2,"active_window_id":null}}"#;
+    match parse_event_line(line2).unwrap() {
+        NiriEvent::WorkspaceActiveWindowChanged { active_window_id, .. } => {
+            assert_eq!(active_window_id, None);
+        }
+        other => panic!("unexpected: {other:?}"),
+    }
+}
+
+#[test]
 fn focused_window_extraction() {
     let windows = vec![
         NiriWindow { id: 1, title: "a".into(), app_id: "x".into(), pid: 10, workspace_id: Some(1), is_focused: false },

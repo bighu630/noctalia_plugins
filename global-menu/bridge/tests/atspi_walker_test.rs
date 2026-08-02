@@ -1,5 +1,8 @@
-use noctalia_global_menu_bridge::atspi::{build_menu_tree, RawNode, ROLE_CHECK_MENU_ITEM, ROLE_MENU, ROLE_MENU_BAR, ROLE_MENU_ITEM, ROLE_SEPARATOR, STATE_CHECKED, STATE_ENABLED, STATE_SENSITIVE, STATE_VISIBLE};
+use noctalia_global_menu_bridge::atspi::{build_menu_tree, RawNode, ROLE_CHECK_MENU_ITEM, ROLE_MENU, ROLE_MENU_BAR, ROLE_MENU_ITEM, ROLE_SEPARATOR, STATE_CHECKED, STATE_ENABLED, STATE_SENSITIVE};
 use noctalia_global_menu_bridge::protocol::{MenuItemType};
+
+// 可见性位用字面量 1<<30 锁定（ATSPI_STATE_VISIBLE 权威值 = 30，31 是 MANAGES_DESCENDANTS）：
+// fixture 不依赖常量，防止常量回归时测试静默失真。
 
 fn node(role: u32, name: &str, state: (u32, u32), children: Vec<RawNode>) -> RawNode {
     RawNode { role, name: name.into(), state, children, acc: None }
@@ -10,12 +13,12 @@ fn builds_tree_with_types_and_checked_state() {
     // File ▸ New / Open… ; View ─ Show All [checked]
     let root = node(ROLE_MENU_BAR, "", (0, 0), vec![
         node(ROLE_MENU, "File", (0, 0), vec![
-            node(ROLE_MENU_ITEM, "New", (1 << STATE_ENABLED | 1 << STATE_SENSITIVE | 1 << STATE_VISIBLE, 0), vec![]),
-            node(ROLE_MENU_ITEM, "Open…", (1 << STATE_ENABLED | 1 << STATE_SENSITIVE | 1 << STATE_VISIBLE, 0), vec![]),
+            node(ROLE_MENU_ITEM, "New", (1 << STATE_ENABLED | 1 << STATE_SENSITIVE | 1 << 30, 0), vec![]),
+            node(ROLE_MENU_ITEM, "Open…", (1 << STATE_ENABLED | 1 << STATE_SENSITIVE | 1 << 30, 0), vec![]),
         ]),
         node(ROLE_MENU, "View", (0, 0), vec![
-            node(ROLE_CHECK_MENU_ITEM, "Show All", (1 << STATE_ENABLED | 1 << STATE_SENSITIVE | 1 << STATE_VISIBLE | 1 << STATE_CHECKED, 0), vec![]),
-            node(ROLE_SEPARATOR, "", (1 << STATE_VISIBLE, 0), vec![]),
+            node(ROLE_CHECK_MENU_ITEM, "Show All", (1 << STATE_ENABLED | 1 << STATE_SENSITIVE | 1 << 30 | 1 << STATE_CHECKED, 0), vec![]),
+            node(ROLE_SEPARATOR, "", (1 << 30, 0), vec![]),
         ]),
     ]);
     let mut ids = 0u32;
@@ -36,11 +39,11 @@ fn builds_tree_with_types_and_checked_state() {
 fn ids_are_dfs_ordered_and_unique() {
     let root = node(ROLE_MENU_BAR, "", (0, 0), vec![
         node(ROLE_MENU, "A", (0, 0), vec![
-            node(ROLE_MENU_ITEM, "A1", (1 << STATE_VISIBLE, 0), vec![]),
-            node(ROLE_MENU_ITEM, "A2", (1 << STATE_VISIBLE, 0), vec![]),
+            node(ROLE_MENU_ITEM, "A1", (1 << 30, 0), vec![]),
+            node(ROLE_MENU_ITEM, "A2", (1 << 30, 0), vec![]),
         ]),
         node(ROLE_MENU, "B", (0, 0), vec![
-            node(ROLE_MENU_ITEM, "B1", (1 << STATE_VISIBLE, 0), vec![]),
+            node(ROLE_MENU_ITEM, "B1", (1 << 30, 0), vec![]),
         ]),
     ]);
     let mut ids = 0u32;
@@ -59,7 +62,7 @@ fn invisible_items_are_filtered() {
     let root = node(ROLE_MENU_BAR, "", (0, 0), vec![
         node(ROLE_MENU, "A", (0, 0), vec![
             node(ROLE_MENU_ITEM, "Hidden", (1 << STATE_ENABLED, 0), vec![]), // 无 VISIBLE
-            node(ROLE_MENU_ITEM, "Shown", (1 << STATE_VISIBLE, 0), vec![]),
+            node(ROLE_MENU_ITEM, "Shown", (1 << 30, 0), vec![]),
         ]),
     ]);
     let mut ids = 0u32;
@@ -73,9 +76,9 @@ fn qt_wrapper_menu_is_flattened() {
     // Qt 每个 MENU_ITEM 的 popup 包在无名 MENU 里 → 扁平化
     let root = node(ROLE_MENU_BAR, "", (0, 0), vec![
         node(ROLE_MENU, "File", (0, 0), vec![
-            node(ROLE_MENU_ITEM, "Open", (1 << STATE_VISIBLE, 0), vec![
+            node(ROLE_MENU_ITEM, "Open", (1 << 30, 0), vec![
                 node(ROLE_MENU, "", (0, 0), vec![
-                    node(ROLE_MENU_ITEM, "Open Recent", (1 << STATE_VISIBLE, 0), vec![]),
+                    node(ROLE_MENU_ITEM, "Open Recent", (1 << 30, 0), vec![]),
                 ]),
             ]),
         ]),
