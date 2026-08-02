@@ -32,6 +32,22 @@
         "Utility"
       ],
       "lastUpdated": "2026-03-31T23:08:01-07:00"
+    },
+    {
+      "id": "bighu630/global-menu",
+      "name": "Global Menu",
+      "version": "0.1.0",
+      "official": false,
+      "author": "Bighu630",
+      "description": "macOS-style global menu for GTK3 apps on niri via an AT-SPI bridge.",
+      "repository": "https://github.com/bighu630/noctalia_plugins",
+      "license": "MIT",
+      "plugin_api": 14,
+      "tags": [
+        "Bar",
+        "Utility"
+      ],
+      "lastUpdated": "2026-08-02T08:46:33+08:00"
     }
   ]
 }
