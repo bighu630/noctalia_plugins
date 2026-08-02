@@ -106,6 +106,20 @@ fn run() -> Result<()> {
                 // is_focused 全 false 导致菜单停摆；焦点回到窗口时靠
                 // WorkspaceActiveWindowChanged 恢复解析（与 FocusChanged 同一去抖路径）。
                 if let Some(id) = id {
+                    // R1 门控：WorkspaceActiveWindowChanged 是**任意工作区**的活动窗口变化，
+                    // 后台工作区窗口开/关不应抢当前菜单。仅当与当前 session 窗口同工作区
+                    // （或无 session 的初始恢复）时才接受。
+                    let same_workspace = {
+                        let st = shared.lock().unwrap();
+                        match st.session.as_ref().map(|s| s.focus.win_id) {
+                            Some(cur) => {
+                                let cur_ws = window_cache.iter().find(|w| w.id == cur).and_then(|w| w.workspace_id);
+                                let new_ws = window_cache.iter().find(|w| w.id == id).and_then(|w| w.workspace_id);
+                                cur_ws.is_none() || new_ws.is_none() || cur_ws == new_ws
+                            }
+                            None => true, // 无 session：初始恢复场景，接受
+                        }
+                    };
                     let stale = shared
                         .lock()
                         .unwrap()
@@ -113,7 +127,7 @@ fn run() -> Result<()> {
                         .as_ref()
                         .map(|s| s.focus.win_id != id)
                         .unwrap_or(true);
-                    if stale {
+                    if same_workspace && stale {
                         pending_focus = Some(id);
                         debounce_deadline = Some(std::time::Instant::now() + Duration::from_millis(DEBOUNCE_MS));
                     }
