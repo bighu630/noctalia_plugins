@@ -10,7 +10,7 @@ use zbus::blocking::Connection;
 use zvariant::OwnedObjectPath;
 
 pub const ROLE_CHECK_MENU_ITEM: u32 = 8;
-pub const ROLE_FRAME: u32 = 28;
+pub const ROLE_FRAME: u32 = 23; // atspi-constants.h 权威值（实测 GIMP 窗口 role=23）
 pub const ROLE_MENU: u32 = 33;
 pub const ROLE_MENU_BAR: u32 = 34;
 pub const ROLE_MENU_ITEM: u32 = 35;

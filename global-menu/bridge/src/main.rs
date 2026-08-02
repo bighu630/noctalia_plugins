@@ -99,8 +99,19 @@ fn run() -> Result<()> {
             }
             Ok(Ctrl::Windows(w)) => {
                 window_cache = w;
+                // 初始快照/窗口列表刷新：若当前焦点窗口与已解析会话不一致，立即解析。
+                // （修复启动竞态：焦点切换事件先于窗口快照到达时会 miss，靠这里兜底）
                 if let Some(f) = current_focus(&window_cache) {
-                    shared.lock().unwrap().focus = Some(f);
+                    let stale = shared
+                        .lock()
+                        .unwrap()
+                        .session
+                        .as_ref()
+                        .map(|s| s.focus.win_id != f.win_id)
+                        .unwrap_or(true);
+                    if stale {
+                        handle_focus(&atspi, &sink, &shared, f)?;
+                    }
                 }
             }
             Ok(Ctrl::Refresh) => {
@@ -123,6 +134,14 @@ fn run() -> Result<()> {
                 if let Some(id) = pending_focus.take() {
                     if let Some(focus) = focus_from_cache(&window_cache, id) {
                         handle_focus(&atspi, &sink, &shared, focus)?;
+                    } else {
+                        // 缓存 miss（启动竞态）：现场查询全量快照再解析
+                        if let Ok(windows) = niri::query_windows() {
+                            window_cache = windows;
+                            if let Some(focus) = focus_from_cache(&window_cache, id) {
+                                handle_focus(&atspi, &sink, &shared, focus)?;
+                            }
+                        }
                     }
                 }
                 debounce_deadline = None;
