@@ -6,6 +6,9 @@ local state = noctalia.state
 local bridgePath = noctalia.pluginDir() .. "/bridge-bin/noctalia-global-menu-bridge"
 local bridgePort = nil
 local restartDelayUntil = 0
+local bridgeStarting = false
+local bridgeStartTime = 0
+local BRIDGE_HELLO_TIMEOUT_MS = 15000
 local RESTART_COOLDOWN_MS = 10000
 
 local function nowMs()
@@ -40,6 +43,7 @@ local function handleLine(line)
   if not ev then return end
   if ev.type == "hello" then
     bridgePort = ev.port
+    bridgeStarting = false
     state.set("gm_bridge", noctalia.json.encode({ port = ev.port, alive = true }))
     noctalia.log("GlobalMenu bridge up on port " .. tostring(ev.port))
   elseif ev.type == "menu" then
@@ -51,9 +55,18 @@ end
 
 local function startBridge()
   if nowMs() < restartDelayUntil then return end
+  if bridgeStarting then
+    -- 已启动等待 hello；超时（桥可能卡死/流断）才允许重启
+    if nowMs() - bridgeStartTime > BRIDGE_HELLO_TIMEOUT_MS then
+      bridgeStarting = false
+    else
+      return
+    end
+  end
   local ok = noctalia.runStream(bridgePath, handleLine)
   if ok then
-    -- 等 hello 事件登记 port
+    bridgeStarting = true
+    bridgeStartTime = nowMs()
   else
     -- 常见原因：bridge-bin 未构建（noctalia-global-menu-bridge 缺失）
     noctalia.log("GlobalMenu: failed to start bridge（若 bridge-bin 缺失，请运行 scripts/build.sh 构建桥），" .. math.floor(RESTART_COOLDOWN_MS / 1000) .. "s 后重试")
