@@ -80,13 +80,9 @@ end
 
 -- 点击顶层菜单项：拉最新子项 + 打开 popup 面板（外部 dismiss 已先行关闭 → 单 toggle 即打开）
 function onTopClick(item)
-  noctalia.log("GM-CLICK: " .. tostring(item.label) .. " port=" .. tostring(bridgeInfo and bridgeInfo.port or "nil"))
   if not bridgeInfo or not bridgeInfo.port or not item.path then return end
   httpPost(bridgeInfo.port, "/open", { path = item.path }, function(resp)
-    if not resp or not resp.ok then
-      noctalia.log("GM-CLICK /open failed: " .. tostring(resp and resp.ok))
-      return
-    end
+    if not resp or not resp.ok then return end
     local ok3, data = pcall(noctalia.json.decode, resp.body or "{}")
     if not ok3 or not data or not data.ok then return end
     state.set("gm_popup", noctalia.json.encode({

@@ -58,17 +58,19 @@ fn ids_are_dfs_ordered_and_unique() {
 }
 
 #[test]
-fn invisible_items_are_filtered() {
+fn items_without_visible_state_are_kept() {
+    // Qt 菜单项 state 无 VISIBLE/SHOWING（实测 Dolphin 仅 ENABLED|SENSITIVE），
+    // 可见性过滤会误杀 → 不过滤，信任 a11y 树只含可见组件。
     let root = node(ROLE_MENU_BAR, "", (0, 0), vec![
         node(ROLE_MENU, "A", (0, 0), vec![
-            node(ROLE_MENU_ITEM, "Hidden", (1 << STATE_ENABLED, 0), vec![]), // 无 VISIBLE
-            node(ROLE_MENU_ITEM, "Shown", (1 << 30, 0), vec![]),
+            node(ROLE_MENU_ITEM, "Qt Item", (1 << STATE_ENABLED, 0), vec![]), // 无 VISIBLE
+            node(ROLE_MENU_ITEM, "Gtk Item", (1 << 30, 0), vec![]),
         ]),
     ]);
     let mut ids = 0u32;
     let tree = build_menu_tree(&root, &mut ids);
-    assert_eq!(tree.children[0].children.len(), 1);
-    assert_eq!(tree.children[0].children[0].label, "Shown");
+    assert_eq!(tree.children[0].children.len(), 2);
+    assert_eq!(tree.children[0].children[0].label, "Qt Item");
 }
 
 #[test]

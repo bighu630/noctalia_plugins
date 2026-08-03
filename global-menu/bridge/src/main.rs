@@ -47,6 +47,10 @@ fn main() {
 fn run() -> Result<()> {
     // 1. 会话总线 + a11y 总线
     let session = zbus::blocking::Connection::session()?;
+    match status::enable_launcher_a11y(&session) {
+        Ok(()) => eprintln!("[global-menu-bridge] org.a11y.Bus IsEnabled=true"),
+        Err(e) => eprintln!("[global-menu-bridge] IsEnabled set failed (non-fatal): {e:#}"),
+    }
     match status::own_status(&session) {
         Ok(()) => eprintln!("[global-menu-bridge] org.a11y.Status owned"),
         Err(e) => eprintln!("[global-menu-bridge] org.a11y.Status unavailable (non-fatal): {e:#}"),

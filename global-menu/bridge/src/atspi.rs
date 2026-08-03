@@ -284,15 +284,12 @@ impl AtspiClient {
 
 // ── 纯逻辑：RawNode → 统一菜单树 ───────────────────────────────
 
-/// 可见性判据：MENU/MENU_BAR 是结构容器，总是保留（关闭的子菜单
-/// VISIBLE/SHOWING 位为 0 也要出现在树里）；叶子项须带 VISIBLE 或
-/// SHOWING 位，否则过滤（不占 id）。
-/// pub(crate)：/open 路径（proxy::build_children）复用同一策略过滤直接子项。
-pub(crate) fn is_visible(node: &RawNode) -> bool {
-    node.role == ROLE_MENU
-        || node.role == ROLE_MENU_BAR
-        || node.state.0 & (1 << STATE_VISIBLE) != 0
-        || node.state.0 & (1 << STATE_SHOWING) != 0
+/// 可见性判据：**不过滤**。ATK/Qt 的 a11y 树只含可见组件；Qt 菜单项
+/// state 无 VISIBLE/SHOWING 位（实测 Dolphin 菜单项仅 ENABLED|SENSITIVE），
+/// 按 state 过滤会误杀全部 Qt 菜单。信任树结构本身。
+/// pub(crate)：/open 路径（proxy::build_children）复用同一策略。
+pub(crate) fn is_visible(_node: &RawNode) -> bool {
+    true
 }
 
 /// 由 RawNode 构建 MenuItem 树。ids 为 DFS 分配器（会话内连续）。
@@ -301,7 +298,7 @@ pub(crate) fn is_visible(node: &RawNode) -> bool {
 /// - MENU_ITEM → item；子节点为无名 MENU 时扁平化（Qt wrapper）
 /// - CHECK/RADIO_MENU_ITEM → checkbox/radio（checked 取 state 位）
 /// - SEPARATOR → separator
-/// - 无 STATE_VISIBLE 的项过滤（不占 id）
+/// - 可见性不过滤（Qt 菜单项无 VISIBLE/SHOWING 位，实测 Dolphin）
 /// - path = 相对根的 child-index 链（**原始** children 索引，含不可见项；与 locate_by_path 一致）
 /// build_item 的公开包装（proxy::open_path 需要与主树同形的子项）。
 pub fn build_item_pub(node: &RawNode, path: &[u32], ids: &mut u32) -> crate::protocol::MenuItem {

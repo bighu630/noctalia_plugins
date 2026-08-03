@@ -27,6 +27,23 @@ impl A11yStatus {
     }
 }
 
+/// 把 at-spi-bus-launcher 的 org.a11y.Status.IsEnabled 置 true。
+/// Chromium/Electron/Qt 检测 a11y 是否启用读的是 **org.a11y.Bus 服务**上的
+/// IsEnabled 属性（readwrite，由外部显式 Set；GNOME 由 settings-daemon 管，
+/// niri 无人管 → 默认 false → Chromium/Qt 不注册 a11y）。实测置 true 后
+/// Chrome/Dolphin/KDE 应用全部注册（2026-08-03 实证）。
+pub fn enable_launcher_a11y(conn: &Connection) -> anyhow::Result<()> {
+    use zvariant::Value;
+    let _ = conn.call_method(
+        Some("org.a11y.Bus"),
+        "/org/a11y/bus",
+        Some("org.freedesktop.DBus.Properties"),
+        "Set",
+        &("org.a11y.Status", "IsEnabled", Value::Bool(true)),
+    )?;
+    Ok(())
+}
+
 /// 尝试注册 org.a11y.Status。失败（名字已被占）仅 warn，不致命。
 pub fn own_status(conn: &Connection) -> anyhow::Result<()> {
     // zbus 4.4：blocking::fdo 内的 RequestNameFlags/Reply 为私有 re-export，
