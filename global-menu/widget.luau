@@ -89,7 +89,7 @@ function onTopClick(item)
     if not ok3 or not data or not data.ok then return end
     state.set("gm_popup", noctalia.json.encode({
       title = item.label,
-      parentPath = item.path,
+      path = item.path,
       items = data.children or {},
     }))
     noctalia.togglePanel(POPUP_ID)
