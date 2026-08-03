@@ -64,6 +64,18 @@ state.watch("gm_bridge", function(json)
   bridgeInfo = ok and v or nil
 end)
 
+-- 初始化恢复：watch 只响应变化，用同步 get 兜底
+local okG, vG = pcall(noctalia.state.get, "gm_bridge")
+if okG and vG then
+  local okD, vD = pcall(noctalia.json.decode, vG)
+  if okD and vD then bridgeInfo = vD end
+end
+local okG2, vG2 = pcall(noctalia.state.get, "gm_popup")
+if okG2 and vG2 then
+  local okD2, vD2 = pcall(noctalia.json.decode, vG2)
+  if okD2 and vD2 then popupData = vD2 end
+end
+
 local function httpPost(port, path, bodyTable, cb)
   if not port or port == 0 then return end
   noctalia.http({
@@ -85,14 +97,14 @@ end
 -- 点击带子菜单的项：递归展开（同面板替换内容）
 function onSubmenuClick(item)
   if not bridgeInfo or not bridgeInfo.port or not item.path then return end
-  httpPost(bridgeInfo.port, "/open", { path = item.path }, function(ok2, status, body)
-    if not ok2 then return end
-    local ok3, resp = pcall(noctalia.json.decode, body or "{}")
-    if not ok3 or not resp or not resp.ok then return end
+  httpPost(bridgeInfo.port, "/open", { path = item.path }, function(resp)
+    if not resp or not resp.ok then return end
+    local ok3, data = pcall(noctalia.json.decode, resp.body or "{}")
+    if not ok3 or not data or not data.ok then return end
     state.set("gm_popup", noctalia.json.encode({
       title = item.label,
       parentPath = item.path,
-      items = resp.children or {},
+      items = data.children or {},
     }))
   end)
 end

@@ -77,8 +77,8 @@ end
 
 local function pingAndRestart()
   if not bridgePort then return end
-  httpGet(bridgePort, "/ping", function(ok2)
-    if not ok2 then
+  httpGet(bridgePort, "/ping", function(resp)
+    if not resp or not resp.ok then
       -- 桥已死：标记 down 并重启（旧进程若存活由 /shutdown 清场）
       httpPost(bridgePort, "/shutdown", {}, function() end)
       bridgePort = nil
