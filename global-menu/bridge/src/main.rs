@@ -7,17 +7,20 @@
 //! recv_timeout 驱动；HTTP 线程（tiny_http 自管）。
 
 mod atspi;
+mod dbusmenu;
 mod http;
 mod niri;
 mod protocol;
 mod proxy;
+mod registrar;
 mod stdout_io;
 mod status;
 
 use crate::atspi::{AtspiClient, SharedAtspi};
 use crate::niri::{parse_event_line, NiriEvent, NiriWindow};
 use crate::protocol::BridgeEvent;
-use crate::proxy::{resolve_focus, FocusInfo, Shared};
+use crate::proxy::{resolve_focus, FocusInfo, ProxyCtx, Shared};
+use crate::registrar::{RegistrarHandle, RegistrarState};
 use anyhow::Result;
 use std::io::{BufRead, BufReader};
 use std::process::{Command, Stdio};
@@ -55,13 +58,25 @@ fn run() -> Result<()> {
         Ok(()) => eprintln!("[global-menu-bridge] org.a11y.Status owned"),
         Err(e) => eprintln!("[global-menu-bridge] org.a11y.Status unavailable (non-fatal): {e:#}"),
     }
+    // DBusMenu 管线：拥有 com.canonical.AppMenu.Registrar（Electron/Chromium X11
+    // 模式、KDE 应用经此注册菜单）。失败（名字被占）非致命。
+    let registrar: RegistrarHandle = Arc::new(Mutex::new(RegistrarState::default()));
+    match registrar::own_registrar(&session, &registrar) {
+        Ok(()) => {
+            eprintln!("[global-menu-bridge] com.canonical.AppMenu.Registrar owned");
+            // 恢复持久化注册（Electron 等应用不监听 Registrar 名字出现，桥重启后需恢复）
+            registrar.lock().unwrap().restore(&session);
+        }
+        Err(e) => eprintln!("[global-menu-bridge] AppMenu.Registrar unavailable (non-fatal): {e:#}"),
+    }
     let atspi: SharedAtspi = Arc::new(AtspiClient::connect().map_err(|e| anyhow::anyhow!("AT-SPI unavailable: {e:#}"))?);
 
     // 2. 共享状态 + HTTP
     let (refresh_tx, refresh_rx) = mpsc::channel::<()>();
     let (focus_tx, focus_rx) = mpsc::channel::<Ctrl>();
     let shared = Arc::new(Mutex::new(Shared::default()));
-    let http_server = http::spawn(shared.clone(), atspi.clone(), refresh_tx)?;
+    let ctx = ProxyCtx { conn: session.clone(), registrar: registrar.clone() };
+    let http_server = http::spawn(shared.clone(), atspi.clone(), ctx.clone(), refresh_tx)?;
     let sink = stdout_io::StdoutSink::new();
 
     // /refresh 通道转发到主循环（std mpsc 无 select，转发线程桥接）
@@ -150,14 +165,14 @@ fn run() -> Result<()> {
                         .map(|s| s.focus.win_id != f.win_id)
                         .unwrap_or(true);
                     if stale {
-                        handle_focus(&atspi, &sink, &shared, f)?;
+                        handle_focus(&atspi, &ctx, &sink, &shared, f)?;
                     }
                 }
             }
             Ok(Ctrl::Refresh) => {
                 // 立即按当前焦点重解析
                 if let Some(focus) = current_focus(&window_cache) {
-                    handle_focus(&atspi, &sink, &shared, focus)?;
+                    handle_focus(&atspi, &ctx, &sink, &shared, focus)?;
                 }
             }
             Ok(Ctrl::Quit) => break,
@@ -173,13 +188,13 @@ fn run() -> Result<()> {
             if std::time::Instant::now() >= d {
                 if let Some(id) = pending_focus.take() {
                     if let Some(focus) = focus_from_cache(&window_cache, id) {
-                        handle_focus(&atspi, &sink, &shared, focus)?;
+                        handle_focus(&atspi, &ctx, &sink, &shared, focus)?;
                     } else {
                         // 缓存 miss（启动竞态）：现场查询全量快照再解析
                         if let Ok(windows) = niri::query_windows() {
                             window_cache = windows;
                             if let Some(focus) = focus_from_cache(&window_cache, id) {
-                                handle_focus(&atspi, &sink, &shared, focus)?;
+                                handle_focus(&atspi, &ctx, &sink, &shared, focus)?;
                             }
                         }
                     }
@@ -214,6 +229,7 @@ fn focus_of(w: &NiriWindow) -> FocusInfo {
 
 fn handle_focus(
     atspi: &AtspiClient,
+    ctx: &ProxyCtx,
     sink: &stdout_io::StdoutSink,
     shared: &Arc<Mutex<Shared>>,
     focus: FocusInfo,
@@ -224,18 +240,18 @@ fn handle_focus(
         let mut st = shared.lock().unwrap();
         st.focus = Some(focus.clone());
     }
-    let menu = match resolve_focus(atspi, &focus) {
+    let (menu, source) = match resolve_focus(atspi, ctx, &focus) {
         Ok(m) => m,
         Err(e) => {
             eprintln!("[global-menu-bridge] resolve failed: {e:#}");
-            None
+            (None, "none")
         }
     };
     {
         let mut st = shared.lock().unwrap();
-        st.session = Some(proxy::Session { focus: focus.clone(), menu: menu.clone() });
+        st.session = Some(proxy::Session { focus: focus.clone(), menu: menu.clone(), source });
+        st.source = Some(source);
     }
-    let source = if menu.is_some() { "atspi" } else { "none" };
     sink.emit(&proxy::make_menu_event(&focus, menu, source));
     Ok(())
 }
