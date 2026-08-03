@@ -92,6 +92,9 @@ end
 function update()
   noctalia.setUpdateInterval(5000)
   if bridgePort then
+    -- 周期性重写 gm_bridge：widget/popup 的 watch 若在 hello 之后才注册
+    -- （重启/热重载时序），靠这里兜底拿到端口（state.set 无条件通知）
+    state.set("gm_bridge", noctalia.json.encode({ port = bridgePort, alive = true }))
     pingAndRestart()
   else
     startBridge()
