@@ -118,3 +118,27 @@ index 68cc279..b91b8f4 100644
    std::unique_ptr<FocusGrab> m_focusGrab;
  
    std::unique_ptr<Surface> m_surface;
+
+# ============================================================
+# 应用说明（v1+v2 完整版）
+# ============================================================
+# 让 noctalia.togglePanel(id)（Lua）打开面板时使用"最近一次 bar 按钮
+# 点击位置"作为 open-near-click 锚点，且面板**左边缘对齐点击位置**
+# （macOS 下拉形态）；bar action 内置面板（控制中心等）保持居中。
+#
+# 在 noctalia 源码仓库根目录应用：
+#   git apply /path/to/noctalia-togglepanel-anchor.patch
+# 然后构建安装（meson/just），重启 Noctalia。
+#
+# 改动（3 个文件）：
+#   1. src/shell/bar/bar.cpp            — bar 按钮按下时记录点击位置（output 坐标）
+#   2. src/shell/panel/panel_manager.h  — setLastClickAnchor 声明 + 锚点成员 + anchorLeftAligned
+#   3. src/shell/panel/panel_manager.cpp— 无锚点 togglePanel 用最近点击做锚点（左对齐）
+#
+# 已在 v1 基础上构建过的：手动补 v2 三处即可（增量 ninja 只编译 2 个文件）：
+#   a. panel_manager.h  PanelOpenRequest 加: bool anchorLeftAligned = false;
+#   b. panel_manager.cpp marginLeftFromAnchor 改为三目（anchorLeftAligned ? anchorX : anchorX - panelW/2）
+#   c. panel_manager.cpp togglePanel 无锚点分支加: request.anchorLeftAligned = true;
+#
+# 插件侧配合（生效后）：global-menu/plugin.toml 的 [[panel]] 已配置
+#   position = "auto" + open_near_click = true（无需再改）。
