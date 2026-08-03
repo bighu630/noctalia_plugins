@@ -12,6 +12,9 @@ local bridgeInfo = nil
 local hoverSeq = 0
 local hoverPending = nil -- 当前展开的 path key（字符串），防重复请求
 
+-- 前置声明（Lua 词法作用域：local function 不 forward-reference，闭包需在定义后创建）
+local onItemClick, onSubmenuClick, onSubmenuHover
+
 local function pathKey(path)
   local parts = {}
   if path then
@@ -109,7 +112,7 @@ local function updatePopup(item, data)
 end
 
 -- 点击叶子项：POST /click {path}; 成功后桥自动重拉 → 补发 menu 事件 → widget 刷新。
-local function onItemClick(item)
+function onItemClick(item)
   if not bridgeInfo or not bridgeInfo.port or not item.path then return end
   httpPost(bridgeInfo.port, "/click", { path = item.path }, function()
     panel.close()
@@ -117,7 +120,7 @@ local function onItemClick(item)
 end
 
 -- 点击带子菜单的项：拉子项（同面板替换）
-local function onSubmenuClick(item)
+function onSubmenuClick(item)
   if not bridgeInfo or not bridgeInfo.port or not item.path then return end
   hoverPending = pathKey(item.path)
   httpPost(bridgeInfo.port, "/open", { path = item.path }, function(resp)
@@ -129,7 +132,7 @@ local function onSubmenuClick(item)
 end
 
 -- hover 展开：带请求序号，快速移动时过期响应直接丢弃（跟手）
-local function onSubmenuHover(item)
+function onSubmenuHover(item)
   if not bridgeInfo or not bridgeInfo.port or not item.path then return end
   local key = pathKey(item.path)
   if hoverPending == key then return end
