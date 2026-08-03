@@ -20,6 +20,5 @@ id = "global_menu_popup"
 entry = "popup.luau"
 placement = "floating"
 position = "top"
-open_near_click = true
-dismiss_on_outside_click = true
+dismiss_on_outside_click = true # popup: macOS dropdown
 keyboard_focus = "on_demand"
