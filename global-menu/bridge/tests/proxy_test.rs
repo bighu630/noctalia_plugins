@@ -75,3 +75,22 @@ fn open_children_filter_invisible_like_main_tree() {
     assert_eq!(items[0].label, "Shown");
     assert_eq!(items[0].path, vec![0, 1]); // 原始索引 1（Hidden 被过滤但占槽）
 }
+
+#[test]
+fn prune_to_top_level_keeps_types_but_drops_nested_children() {
+    use noctalia_global_menu_bridge::proxy::prune_to_top_level;
+    let tree = item(1, "", MenuItemType::Submenu, vec![
+        item(2, "File", MenuItemType::Submenu, vec![
+            item(3, "New", MenuItemType::Item, vec![]),
+        ]),
+        item(4, "View", MenuItemType::Submenu, vec![
+            item(5, "Zoom", MenuItemType::Item, vec![]),
+        ]),
+    ]);
+    let pruned = prune_to_top_level(tree);
+    assert_eq!(pruned.children.len(), 2);
+    assert_eq!(pruned.children[0].item_type, MenuItemType::Submenu); // type 保留
+    assert_eq!(pruned.children[0].label, "File");
+    assert!(pruned.children[0].children.is_empty()); // 子树清空
+    assert!(pruned.children[1].children.is_empty());
+}

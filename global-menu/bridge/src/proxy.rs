@@ -21,7 +21,19 @@ pub fn resolve_focus(atspi: &AtspiClient, focus: &FocusInfo) -> Result<Option<Me
         return Ok(None);
     };
     let mut ids = 0u32;
-    Ok(Some(build_menu_tree(&raw, &mut ids)))
+    let tree = build_menu_tree(&raw, &mut ids);
+    // 只下发顶层：完整树可能超过 runStream 单行 64KB 上限（实测 GIMP ~78KB 被整行丢弃）。
+    // 子菜单内容一律由 HTTP /open 懒加载（响应无行大小限制）。
+    Ok(Some(prune_to_top_level(tree)))
+}
+
+/// 裁剪为仅顶层（保留顶层 type/label/enabled，清空所有 children）。
+/// 顶层项是否含子菜单由 type=="submenu" 表达，内容经 /open 获取。
+pub fn prune_to_top_level(mut root: MenuItem) -> MenuItem {
+    for child in &mut root.children {
+        child.children.clear();
+    }
+    root
 }
 
 pub fn make_menu_event(focus: &FocusInfo, menu: Option<MenuItem>, source: &'static str) -> BridgeEvent {
