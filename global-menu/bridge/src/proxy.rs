@@ -47,8 +47,10 @@ pub fn resolve_focus(
     }
     // DBusMenu 回退：查 Registrar（按焦点 pid / X11 窗口类 / comm 匹配）
     let Some(reg) = ctx.registrar.lock().unwrap().find_for_focus(focus.pid, &focus.app_id) else {
+        eprintln!("[global-menu-bridge] dbusmenu fallback: no reg for pid={} app_id={}", focus.pid, focus.app_id);
         return Ok((None, "none"));
     };
+    eprintln!("[global-menu-bridge] dbusmenu fallback: matched xid={} bus={} path={} (pid={})", reg.xid, reg.bus, reg.path, reg.pid);
     let root = fetch_layout(&ctx.conn, &reg.bus, &reg.path)?;
     let mut ids = 0u32;
     let tree = raw_to_menu_item(&root, &[], &mut ids);
