@@ -64,33 +64,52 @@ fn open_children_paths_are_parent_plus_raw_index() {
 }
 
 #[test]
-fn open_children_filter_invisible_like_main_tree() {
-    // 与主树可见性策略一致：不可见叶子不出现，但 path 槽位仍是原始 child-index
+fn open_children_keeps_all_items_matching_main_tree_policy() {
+    // Qt/ATK 树只含可见组件（state 无 VISIBLE/SHOWING 位，实测 Dolphin），
+    // is_visible 不过滤（commit 7214299 移除位过滤后与主树策略一致）。
     let raws = vec![
         raw_node(ROLE_MENU_ITEM, "Hidden", (0, 0), vec![]), // 无 VISIBLE 位
         raw_node(ROLE_MENU_ITEM, "Shown", (1 << 30, 0), vec![]),
     ];
     let items = build_children(&raws, &[0]);
-    assert_eq!(items.len(), 1);
-    assert_eq!(items[0].label, "Shown");
-    assert_eq!(items[0].path, vec![0, 1]); // 原始索引 1（Hidden 被过滤但占槽）
+    assert_eq!(items.len(), 2);
+    assert_eq!(items[0].label, "Hidden");
+    assert_eq!(items[0].path, vec![0, 0]); // 原始索引
+    assert_eq!(items[1].label, "Shown");
+    assert_eq!(items[1].path, vec![0, 1]);
 }
 
 #[test]
-fn prune_to_top_level_keeps_types_but_drops_nested_children() {
+fn menu_event_carries_dbusmenu_source() {
+    let focus = FocusInfo { win_id: 40, app_id: "Typora".into(), title: "Typora".into(), pid: 2682 };
+    let menu = Some(item(1, "", MenuItemType::Submenu, vec![item(2, "File", MenuItemType::Submenu, vec![])]));
+    let ev = make_menu_event(&focus, menu, "dbusmenu");
+    let v = serde_json::to_value(&ev).unwrap();
+    assert_eq!(v["source"], "dbusmenu");
+    assert_eq!(v["app"]["pid"], 2682);
+    assert_eq!(v["menu"]["children"][0]["label"], "File");
+}
+
+#[test]
+fn session_records_source_for_dispatch() {
+    use noctalia_global_menu_bridge::proxy::Session;
+    let focus = FocusInfo { win_id: 1, app_id: "app".into(), title: "t".into(), pid: 2 };
+    let s = Session { focus: focus.clone(), menu: None, source: "dbusmenu" };
+    assert_eq!(s.source, "dbusmenu");
+    assert_eq!(s.focus, focus);
+}
+
+#[test]
+fn prune_to_top_level_preserves_dbusmenu_submenu_types() {
     use noctalia_global_menu_bridge::proxy::prune_to_top_level;
+    // dbusmenu 转换后的树：顶层 type=submenu（有 children），裁剪后必须保留
+    // submenu 类型，插件才继续 /open 懒加载。
     let tree = item(1, "", MenuItemType::Submenu, vec![
-        item(2, "File", MenuItemType::Submenu, vec![
-            item(3, "New", MenuItemType::Item, vec![]),
-        ]),
-        item(4, "View", MenuItemType::Submenu, vec![
-            item(5, "Zoom", MenuItemType::Item, vec![]),
-        ]),
+        item(2, "File", MenuItemType::Submenu, vec![item(3, "New", MenuItemType::Item, vec![])]),
+        item(4, "Help", MenuItemType::Item, vec![]),
     ]);
     let pruned = prune_to_top_level(tree);
-    assert_eq!(pruned.children.len(), 2);
-    assert_eq!(pruned.children[0].item_type, MenuItemType::Submenu); // type 保留
-    assert_eq!(pruned.children[0].label, "File");
-    assert!(pruned.children[0].children.is_empty()); // 子树清空
-    assert!(pruned.children[1].children.is_empty());
+    assert_eq!(pruned.children[0].item_type, MenuItemType::Submenu);
+    assert!(pruned.children[0].children.is_empty());
+    assert_eq!(pruned.children[1].item_type, MenuItemType::Item);
 }

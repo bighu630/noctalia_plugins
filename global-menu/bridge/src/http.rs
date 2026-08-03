@@ -2,7 +2,7 @@
 //! 端点：GET /ping、POST /click、POST /open、POST /refresh、POST /shutdown。
 
 use crate::atspi::SharedAtspi;
-use crate::proxy::{build_children_response, click_path, open_path, Shared};
+use crate::proxy::{build_children_response, click_path, open_path, ProxyCtx, Shared};
 use anyhow::{anyhow, Result};
 use serde::Deserialize;
 use std::io::Read;
@@ -24,6 +24,7 @@ pub struct HttpServer {
 pub fn spawn(
     shared: Arc<Mutex<Shared>>,
     atspi: SharedAtspi,
+    ctx: ProxyCtx,
     refresh_tx: Sender<()>,
 ) -> Result<HttpServer> {
     // tiny_http 0.12：Server 非 Clone，shutdown/unblock 与请求循环共享 Arc。
@@ -42,11 +43,12 @@ pub fn spawn(
         for mut request in server.incoming_requests() {
             let shared = shared.clone();
             let atspi = atspi.clone();
+            let ctx = ctx.clone();
             let refresh_tx = refresh_tx.clone();
             // 每请求一线程：/click 全树重解析耗时数秒，不能阻塞 /ping 心跳
             // 探测（否则插件误判桥死亡而重启）。shared/atspi/refresh_tx 均可 clone。
             thread::spawn(move || {
-                let response = handle(&mut request, shared, atspi, refresh_tx);
+                let response = handle(&mut request, shared, atspi, ctx, refresh_tx);
                 let _ = request.respond(response);
             });
         }
@@ -59,6 +61,7 @@ fn handle(
     request: &mut tiny_http::Request,
     shared: Arc<Mutex<Shared>>,
     atspi: SharedAtspi,
+    ctx: ProxyCtx,
     refresh_tx: Sender<()>,
 ) -> tiny_http::Response<std::io::Cursor<Vec<u8>>> {
     let path = request.url().split('?').next().unwrap_or("/").to_string();
@@ -84,12 +87,21 @@ fn handle(
         }
 
         (_, "/click") => {
-            let st = shared.lock().unwrap();
-            let Some(focus) = st.focus.clone().or_else(|| st.session.as_ref().map(|s| s.focus.clone())) else {
+            let (focus, source) = {
+                let st = shared.lock().unwrap();
+                let focus = st.focus.clone().or_else(|| st.session.as_ref().map(|s| s.focus.clone()));
+                // 解析完成前 source 为 None → 回退 atspi（旧行为）
+                let source = st
+                    .source
+                    .or_else(|| st.session.as_ref().map(|s| s.source))
+                    .unwrap_or("atspi");
+                (focus, source)
+            };
+            let Some(focus) = focus else {
                 return json(200, serde_json::json!({"ok": false, "error": "no session"}));
             };
             match serde_json::from_str::<PathBody>(&body) {
-                Ok(b) => match click_path(&atspi, &focus, &b.path) {
+                Ok(b) => match click_path(source, &atspi, &ctx, &focus, &b.path) {
                     Ok((found, clicked)) => {
                         let ok = found && clicked;
                         if ok {
@@ -105,12 +117,20 @@ fn handle(
         }
 
         (_, "/open") => {
-            let st = shared.lock().unwrap();
-            let Some(focus) = st.focus.clone().or_else(|| st.session.as_ref().map(|s| s.focus.clone())) else {
+            let (focus, source) = {
+                let st = shared.lock().unwrap();
+                let focus = st.focus.clone().or_else(|| st.session.as_ref().map(|s| s.focus.clone()));
+                let source = st
+                    .source
+                    .or_else(|| st.session.as_ref().map(|s| s.source))
+                    .unwrap_or("atspi");
+                (focus, source)
+            };
+            let Some(focus) = focus else {
                 return json(200, serde_json::json!({"ok": false, "error": "no session"}));
             };
             match serde_json::from_str::<PathBody>(&body) {
-                Ok(b) => match open_path(&atspi, &focus, &b.path) {
+                Ok(b) => match open_path(source, &atspi, &ctx, &focus, &b.path) {
                     Ok((found, items)) => {
                         if found {
                             serde_json::to_value(build_children_response(true, items)).unwrap()
