@@ -1,0 +1,116 @@
+diff --git a/src/shell/bar/bar.cpp b/src/shell/bar/bar.cpp
+index 5e0948e..5d12041 100644
+--- a/src/shell/bar/bar.cpp
++++ b/src/shell/bar/bar.cpp
+@@ -3334,6 +3334,24 @@ bool Bar::onPointerEvent(const PointerEvent& event) {
+     case PointerEvent::Type::Motion:
+     case PointerEvent::Type::Button:
+     case PointerEvent::Type::Axis:
++      if (event.type == PointerEvent::Type::Button && event.pressed) {
++        // 记录最近一次 bar 按钮按下位置（output 逻辑坐标）：Lua 的
++        // noctalia.togglePanel 无锚点 API，打开面板时用它作 open-near-click
++        // 锚点，让插件面板（如全局菜单）出现在触发按钮附近。
++        if (targetInstance != nullptr && targetInstance->output != nullptr) {
++          float anchorX = static_cast<float>(event.sx);
++          float anchorY = static_cast<float>(event.sy);
++          if (m_platform != nullptr) {
++            if (const auto* out = m_platform->findOutputByWl(targetInstance->output);
++                out != nullptr && out->hasUsableGeometry()) {
++              const auto [surfaceX, surfaceY] = surfaceOriginForOutputLocal(*targetInstance, *out);
++              anchorX += surfaceX;
++              anchorY += surfaceY;
++            }
++          }
++          PanelManager::instance().setLastClickAnchor(targetInstance->output, anchorX, anchorY);
++        }
++      }
+       if (event.type == PointerEvent::Type::Button && event.button == BTN_RIGHT && event.pressed) {
+         const auto sx = static_cast<float>(event.sx);
+         const auto sy = static_cast<float>(event.sy);
+diff --git a/src/shell/panel/panel_manager.cpp b/src/shell/panel/panel_manager.cpp
+index 080278c..bb64ad1 100644
+--- a/src/shell/panel/panel_manager.cpp
++++ b/src/shell/panel/panel_manager.cpp
+@@ -1419,6 +1419,13 @@ void PanelManager::togglePanel(const std::string& panelId, PanelOpenRequest requ
+   }
+ }
+ 
++void PanelManager::setLastClickAnchor(wl_output* output, float x, float y) {
++  m_lastClickAnchorOutput = output;
++  m_lastClickAnchorX = x;
++  m_lastClickAnchorY = y;
++  m_hasLastClickAnchor = true;
++}
++
+ void PanelManager::togglePanel(const std::string& panelId) {
+   if (m_persistentHost.hasPanel(panelId)) {
+     if (m_persistentHost.isOpen(panelId)) {
+@@ -1432,8 +1439,17 @@ void PanelManager::togglePanel(const std::string& panelId) {
+     closePanel();
+     return;
+   }
+-  // Output left unset: openPanel resolves it (focus source, else compositor probe).
+-  openPanel(panelId, PanelOpenRequest{});
++  // Lua noctalia.togglePanel 无锚点 API：用最近一次 bar 按钮点击位置作为
++  // open-near-click 锚点（bar 层在按钮按下时调用 setLastClickAnchor）。
++  PanelOpenRequest request;
++  if (m_hasLastClickAnchor) {
++    request.output = m_lastClickAnchorOutput;
++    request.anchorX = m_lastClickAnchorX;
++    request.anchorY = m_lastClickAnchorY;
++    request.hasAnchorPosition = true;
++  }
++  // Output left unset (no anchor): openPanel resolves it (focus source, else probe).
++  openPanel(panelId, std::move(request));
+ }
+ 
+ bool PanelManager::onPointerEvent(const PointerEvent& event) {
+diff --git a/src/shell/panel/panel_manager.h b/src/shell/panel/panel_manager.h
+index 68cc279..e115623 100644
+--- a/src/shell/panel/panel_manager.h
++++ b/src/shell/panel/panel_manager.h
+@@ -106,6 +106,10 @@ public:
+   bool onPointerEvent(const PointerEvent& event);
+   void onKeyboardEvent(const KeyboardEvent& event);
+ 
++  /// 记录最近一次 bar 按钮按下位置（output 逻辑坐标），供无锚点 togglePanel
++  /// （Lua noctalia.togglePanel）打开面板时作为 open-near-click 锚点。
++  void setLastClickAnchor(wl_output* output, float x, float y);
++
+   [[nodiscard]] bool isOpen() const noexcept;
+   [[nodiscard]] bool isOpenPanel(std::string_view panelId) const noexcept;
+   [[nodiscard]] bool isPanelTransitionActive() const noexcept;
+@@ -211,6 +215,12 @@ private:
+   std::function<bool(wl_output*, std::string_view)> m_attachedPanelBarSettledCallback;
+   PanelClickShield m_clickShield;
+   PersistentPanelHost m_persistentHost;
++
++  // 最近一次 bar 按钮点击锚点（Lua togglePanel 无锚点 API，用 bar 指针位置兜底）
++  wl_output* m_lastClickAnchorOutput = nullptr;
++  float m_lastClickAnchorX = 0.0f;
++  float m_lastClickAnchorY = 0.0f;
++  bool m_hasLastClickAnchor = false;
+   std::unique_ptr<FocusGrab> m_focusGrab;
+ 
+   std::unique_ptr<Surface> m_surface;
+
+# ============================================================
+# 应用说明
+# ============================================================
+# 该补丁让 noctalia.togglePanel(id)（Lua）打开面板时使用"最近一次 bar 按钮
+# 点击位置"作为 open-near-click 锚点，使插件面板（如全局菜单）出现在触发
+# 按钮附近（macOS 风格下拉）。
+#
+# 应用方法（在 noctalia 源码仓库根目录）：
+#   git apply /path/to/noctalia-togglepanel-anchor.patch
+# 然后正常构建安装 noctalia（meson/just），重启 Noctalia。
+#
+# 改动内容（3 个文件）：
+#   1. src/shell/bar/bar.cpp            — bar 按钮按下时记录点击位置（output 坐标）
+#   2. src/shell/panel/panel_manager.h  — setLastClickAnchor 声明 + 锚点成员
+#   3. src/shell/panel/panel_manager.cpp— 无锚点 togglePanel 用最近点击做锚点
+#
+# 插件侧配合（生效后）：
+#   global-menu/plugin.toml 的 [[panel]] 需恢复：
+#     position = "auto"          （或删除 position）
+#     open_near_click = true
