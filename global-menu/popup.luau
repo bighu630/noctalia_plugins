@@ -1,17 +1,24 @@
 --!nonstrict
--- Global Menu 子菜单弹出面板：渲染子项、点击回传、外部点击/Esc 关闭（面板宿主行为）。
+-- Global Menu 子菜单弹出面板（macOS 风格）：紧凑列表、左对齐、hover 展开二级菜单。
 --
--- 渲染机制（Noctalia v5）：面板是**命令式**渲染——调用 panel.render(ui树) 推送 UI 树。
--- 面板开关：widget.luau 是唯一开关方（点击顶层 → /open → 更新 gm_popup → togglePanel）。
--- 本模块只负责渲染内容与回传点击；点击叶子成功后调用 panel.close() 关闭面板
--- （桥随后自动重拉 → 补发 menu 事件 → widget 刷新菜单栏勾选状态）。
+-- 交互：
+-- - 点击叶子项 → POST /click {path} → 桥 DoAction/DBusMenu Event → panel.close()
+-- - hover 带 ▸ 的项 → 自动 /open 拉子项 → 同面板替换（跟手：带请求序号防过期响应）
+-- - 面板位置：floating + position=top + open_near_click（按钮下方/顶部下拉）
 
 local state = noctalia.state
 local popupData = nil -- {title=..., parentPath=..., items=...}
 local bridgeInfo = nil
+local hoverSeq = 0
+local hoverPending = nil -- 当前展开的 path key（字符串），防重复请求
 
--- 前置声明（Lua 词法作用域：local function 不 forward-reference）
-local onItemClick, onSubmenuClick
+local function pathKey(path)
+  local parts = {}
+  if path then
+    for _, p in ipairs(path) do parts[#parts + 1] = tostring(p) end
+  end
+  return table.concat(parts, ",")
+end
 
 local function buildTree()
   if not popupData then
@@ -22,7 +29,7 @@ local function buildTree()
   local rows = {}
   for _, item in ipairs(popupData.items or {}) do
     if item.type == "separator" then
-      rows[#rows + 1] = ui.separator({})
+      rows[#rows + 1] = ui.separator({ thickness = 1 })
     else
       local label = item.label
       if item.type == "checkbox" or item.type == "radio" then
@@ -36,6 +43,8 @@ local function buildTree()
       rows[#rows + 1] = ui.button({
         text = label,
         enabled = item.enabled,
+        contentAlign = "start", -- 左对齐（macOS 菜单风格）
+        controlSize = "sm", -- 紧凑
         onClick = function()
           if hasChildren then
             onSubmenuClick(item)
@@ -43,10 +52,16 @@ local function buildTree()
             onItemClick(item)
           end
         end,
+        -- hover 自动展开二级菜单（跟手）
+        onHover = function()
+          if hasChildren then
+            onSubmenuHover(item)
+          end
+        end,
       })
     end
   end
-  return ui.column({ gap = 2, paddingH = 6, paddingV = 6 }, rows)
+  return ui.column({ gap = 1, paddingH = 4, paddingV = 4 }, rows)
 end
 
 local function refresh()
@@ -85,27 +100,48 @@ local function httpPost(port, path, bodyTable, cb)
   }, cb)
 end
 
+local function updatePopup(item, data)
+  state.set("gm_popup", noctalia.json.encode({
+    title = item.label,
+    parentPath = item.path,
+    items = data.children or {},
+  }))
+end
+
 -- 点击叶子项：POST /click {path}; 成功后桥自动重拉 → 补发 menu 事件 → widget 刷新。
--- 面板随后关闭（panel.close）。
-function onItemClick(item)
+local function onItemClick(item)
   if not bridgeInfo or not bridgeInfo.port or not item.path then return end
   httpPost(bridgeInfo.port, "/click", { path = item.path }, function()
     panel.close()
   end)
 end
 
--- 点击带子菜单的项：递归展开（同面板替换内容）
-function onSubmenuClick(item)
+-- 点击带子菜单的项：拉子项（同面板替换）
+local function onSubmenuClick(item)
   if not bridgeInfo or not bridgeInfo.port or not item.path then return end
+  hoverPending = pathKey(item.path)
   httpPost(bridgeInfo.port, "/open", { path = item.path }, function(resp)
     if not resp or not resp.ok then return end
     local ok3, data = pcall(noctalia.json.decode, resp.body or "{}")
     if not ok3 or not data or not data.ok then return end
-    state.set("gm_popup", noctalia.json.encode({
-      title = item.label,
-      parentPath = item.path,
-      items = data.children or {},
-    }))
+    updatePopup(item, data)
+  end)
+end
+
+-- hover 展开：带请求序号，快速移动时过期响应直接丢弃（跟手）
+local function onSubmenuHover(item)
+  if not bridgeInfo or not bridgeInfo.port or not item.path then return end
+  local key = pathKey(item.path)
+  if hoverPending == key then return end
+  hoverPending = key
+  local seq = hoverSeq + 1
+  hoverSeq = seq
+  httpPost(bridgeInfo.port, "/open", { path = item.path }, function(resp)
+    if seq ~= hoverSeq then return end -- 过期响应
+    if not resp or not resp.ok then return end
+    local ok3, data = pcall(noctalia.json.decode, resp.body or "{}")
+    if not ok3 or not data or not data.ok then return end
+    updatePopup(item, data)
   end)
 end
 

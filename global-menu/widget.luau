@@ -34,11 +34,13 @@ local function buildTree()
       buttons[#buttons + 1] = ui.button({
         text = item.label,
         enabled = item.enabled,
+        contentAlign = "start",
+        controlSize = "sm",
         onClick = function() onTopClick(item) end,
       })
     end
   end
-  return ui.row({ gap = 2, paddingH = 8, paddingV = 2 }, buttons)
+  return ui.row({ gap = 1, paddingH = 4, paddingV = 1 }, buttons)
 end
 
 local function refresh()
