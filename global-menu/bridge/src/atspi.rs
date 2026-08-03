@@ -13,6 +13,7 @@ pub const ROLE_CHECK_MENU_ITEM: u32 = 8;
 pub const ROLE_FRAME: u32 = 23; // atspi-constants.h 权威值（实测 GIMP 窗口 role=23）
 pub const ROLE_MENU: u32 = 33;
 pub const ROLE_MENU_BAR: u32 = 34;
+pub const ROLE_POPUP_MENU: u32 = 41;
 pub const ROLE_MENU_ITEM: u32 = 35;
 pub const ROLE_RADIO_MENU_ITEM: u32 = 45;
 pub const ROLE_SEPARATOR: u32 = 50;
@@ -454,8 +455,22 @@ impl AtspiClient {
         let Some(acc) = &target.acc else { return Ok((false, vec![])) };
         // 子项按 RawNode 读取（与主树 children 同形）；深度 = 目标深度 + 1。
         let depth = path.len() + 1;
-        let children = self
-            .children(acc)
+        // 展开无名 MENU 壳：AT-SPI 菜单结构是 MENU_ITEM → 无名 MENU(role 33)
+        // → 实际子项（GIMP/Qt 都是）。直接读 MENU_ITEM.children 只会得到
+        // [MENU 容器]，/open 返回 1 个空壳导致"展开无内容"（实测 GIMP 文件菜单）。
+        let mut kids = self.children(acc);
+        if kids.len() == 1 {
+            if let Some(first) = kids.first() {
+                // 壳判定：无名 MENU(33) 或无名 POPUP_MENU(41)（GTK 用 33，Qt 用 41）
+                let role = self.get_role(first).unwrap_or(0);
+                let is_menu_shell = (role == ROLE_MENU || role == ROLE_POPUP_MENU)
+                    && self.get_name(first).unwrap_or_default().is_empty();
+                if is_menu_shell {
+                    kids = self.children(first);
+                }
+            }
+        }
+        let children = kids
             .into_iter()
             .filter_map(|c| self.read_node(&c, depth))
             .collect();
