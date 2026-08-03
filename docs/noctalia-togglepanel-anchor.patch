@@ -28,10 +28,23 @@ index 5e0948e..5d12041 100644
          const auto sx = static_cast<float>(event.sx);
          const auto sy = static_cast<float>(event.sy);
 diff --git a/src/shell/panel/panel_manager.cpp b/src/shell/panel/panel_manager.cpp
-index 080278c..bb64ad1 100644
+index 080278c..adedee1 100644
 --- a/src/shell/panel/panel_manager.cpp
 +++ b/src/shell/panel/panel_manager.cpp
-@@ -1419,6 +1419,13 @@ void PanelManager::togglePanel(const std::string& panelId, PanelOpenRequest requ
+@@ -640,8 +640,10 @@ void PanelManager::openPanel(const std::string& panelId, PanelOpenRequest reques
+       && barConfig.reserveSpace
+       && barConfig.thickness > 0;
+   const auto marginLeftFromAnchor = clampMargin(
+-      request.anchorX - static_cast<float>(panelWidth) * 0.5f, static_cast<std::int32_t>(panelWidth), outputWidth,
+-      screenPadding
++      request.anchorLeftAligned
++          ? request.anchorX
++          : request.anchorX - static_cast<float>(panelWidth) * 0.5f,
++      static_cast<std::int32_t>(panelWidth), outputWidth, screenPadding
+   );
+   const auto marginTopFromAnchor = clampMargin(
+       request.anchorY - static_cast<float>(panelHeight) * 0.5f, static_cast<std::int32_t>(panelHeight), outputHeight,
+@@ -1419,6 +1421,13 @@ void PanelManager::togglePanel(const std::string& panelId, PanelOpenRequest requ
    }
  }
  
@@ -45,7 +58,7 @@ index 080278c..bb64ad1 100644
  void PanelManager::togglePanel(const std::string& panelId) {
    if (m_persistentHost.hasPanel(panelId)) {
      if (m_persistentHost.isOpen(panelId)) {
-@@ -1432,8 +1439,17 @@ void PanelManager::togglePanel(const std::string& panelId) {
+@@ -1432,8 +1441,19 @@ void PanelManager::togglePanel(const std::string& panelId) {
      closePanel();
      return;
    }
@@ -59,6 +72,8 @@ index 080278c..bb64ad1 100644
 +    request.anchorX = m_lastClickAnchorX;
 +    request.anchorY = m_lastClickAnchorY;
 +    request.hasAnchorPosition = true;
++    // Lua 触发的面板（如全局菜单）左边缘对齐点击位置（macOS 下拉形态）
++    request.anchorLeftAligned = true;
 +  }
 +  // Output left unset (no anchor): openPanel resolves it (focus source, else probe).
 +  openPanel(panelId, std::move(request));
@@ -66,10 +81,20 @@ index 080278c..bb64ad1 100644
  
  bool PanelManager::onPointerEvent(const PointerEvent& event) {
 diff --git a/src/shell/panel/panel_manager.h b/src/shell/panel/panel_manager.h
-index 68cc279..e115623 100644
+index 68cc279..b91b8f4 100644
 --- a/src/shell/panel/panel_manager.h
 +++ b/src/shell/panel/panel_manager.h
-@@ -106,6 +106,10 @@ public:
+@@ -42,6 +42,9 @@ struct PanelOpenRequest {
+   float anchorY = 0.0f;
+   bool hasExplicitAnchor = false;
+   bool hasAnchorPosition = false;
++  // true: 面板左边缘对齐锚点 x（Lua togglePanel 场景，macOS 菜单下拉）；
++  // false: 面板水平居中于锚点（bar action 内置面板保持原行为）。
++  bool anchorLeftAligned = false;
+   std::string_view context;
+   std::string_view sourceBarName;
+ };
+@@ -106,6 +109,10 @@ public:
    bool onPointerEvent(const PointerEvent& event);
    void onKeyboardEvent(const KeyboardEvent& event);
  
@@ -80,7 +105,7 @@ index 68cc279..e115623 100644
    [[nodiscard]] bool isOpen() const noexcept;
    [[nodiscard]] bool isOpenPanel(std::string_view panelId) const noexcept;
    [[nodiscard]] bool isPanelTransitionActive() const noexcept;
-@@ -211,6 +215,12 @@ private:
+@@ -211,6 +218,12 @@ private:
    std::function<bool(wl_output*, std::string_view)> m_attachedPanelBarSettledCallback;
    PanelClickShield m_clickShield;
    PersistentPanelHost m_persistentHost;
@@ -93,24 +118,3 @@ index 68cc279..e115623 100644
    std::unique_ptr<FocusGrab> m_focusGrab;
  
    std::unique_ptr<Surface> m_surface;
-
-# ============================================================
-# 应用说明
-# ============================================================
-# 该补丁让 noctalia.togglePanel(id)（Lua）打开面板时使用"最近一次 bar 按钮
-# 点击位置"作为 open-near-click 锚点，使插件面板（如全局菜单）出现在触发
-# 按钮附近（macOS 风格下拉）。
-#
-# 应用方法（在 noctalia 源码仓库根目录）：
-#   git apply /path/to/noctalia-togglepanel-anchor.patch
-# 然后正常构建安装 noctalia（meson/just），重启 Noctalia。
-#
-# 改动内容（3 个文件）：
-#   1. src/shell/bar/bar.cpp            — bar 按钮按下时记录点击位置（output 坐标）
-#   2. src/shell/panel/panel_manager.h  — setLastClickAnchor 声明 + 锚点成员
-#   3. src/shell/panel/panel_manager.cpp— 无锚点 togglePanel 用最近点击做锚点
-#
-# 插件侧配合（生效后）：
-#   global-menu/plugin.toml 的 [[panel]] 需恢复：
-#     position = "auto"          （或删除 position）
-#     open_near_click = true
