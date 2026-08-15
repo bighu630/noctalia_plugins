@@ -25,3 +25,15 @@ license = "MIT"
 description = "macOS-style global menu for GTK3 apps on niri via an AT-SPI bridge."
 plugin_api = 14
 tags = ["bar", "utility"]
+
+[[plugin]]
+id = "bighu630/shell-command"
+name = "Shell Command"
+version = "0.2.0"
+updated_at = 1786799469
+added_at = 1786799469
+author = "Bighu630"
+license = "MIT"
+description = "Run a shell command from the launcher in the background. Type /sh then command."
+plugin_api = 14
+tags = ["launcher", "utility"]

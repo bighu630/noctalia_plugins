@@ -1,0 +1,22 @@
+{
+  "hint_title": "Run a shell command",
+  "hint_subtitle": "Type a command after /sh and press Enter to run it in the background",
+  "history_subtitle": "Recent command",
+  "run_start_failed": "Command failed to start",
+  "run_subtitle": "Runs in the background",
+  "run_subtitle_found": "{command} found — runs in the background",
+  "run_title": "Run: {command}",
+  "settings": {
+    "default_workspace": {
+      "description": "Working directory commands run in. Leave empty to use the shell's current directory.",
+      "label": "Default Workspace"
+    },
+    "snippets": {
+      "description": "Commands shown when /sh is empty. Each entry is one command.",
+      "label": "Snippets"
+    }
+  },
+  "snap_subtitle": "Complete: {command} — Enter to run",
+  "snippet_subtitle": "Snippet",
+  "suggest_subtitle": "Suggestion"
+}
