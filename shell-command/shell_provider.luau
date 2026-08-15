@@ -1,6 +1,6 @@
 -- Shell Command launcher provider.
 --
--- Type `/sh <command>` in the launcher to run a shell command in the
+-- Type `/cmd <command>` in the launcher to run a shell command in the
 -- background — no terminal window is opened. Fish-style autosuggestions: as
 -- you type it queries the shell's own completion engine (`fish -c 'complete
 -- -C "<query>"'`, falling back to bash `compgen -c`) so suggestions grow
@@ -97,7 +97,7 @@ end
 --
 -- If the query itself is a `cd <dir> && <cmd>` compound, we cd into `<dir>`
 -- instead of the workspace — that way navigation and a command can be combined
--- in one launch (`/sh cd ~/proj && ls`). Otherwise, if a default workspace is
+-- in one launch (`/cmd cd ~/proj && ls`). Otherwise, if a default workspace is
 -- configured, cd there first.
 local function buildCommand(cmd)
 	local inner = cmd

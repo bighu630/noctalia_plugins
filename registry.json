@@ -55,7 +55,7 @@
       "version": "0.2.0",
       "official": false,
       "author": "Bighu630",
-      "description": "Run a shell command from the launcher in the background. Type /sh then command.",
+      "description": "Run a shell command from the launcher in the background. Type /cmd then command.",
       "repository": "https://github.com/bighu630/noctalia_plugins",
       "license": "MIT",
       "plugin_api": 14,

@@ -1,6 +1,6 @@
 {
   "hint_title": "运行 shell 命令",
-  "hint_subtitle": "在 /sh 后输入命令并按回车，将在后台执行",
+  "hint_subtitle": "在 /cmd 后输入命令并按回车，将在后台执行",
   "history_subtitle": "最近命令",
   "run_start_failed": "命令启动失败",
   "run_subtitle": "后台执行",
@@ -12,7 +12,7 @@
       "label": "默认工作目录"
     },
     "snippets": {
-      "description": "/sh 为空时显示的命令。每项一条命令。",
+      "description": "/cmd 为空时显示的命令。每项一条命令。",
       "label": "命令片段"
     }
   },

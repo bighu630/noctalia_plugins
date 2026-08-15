@@ -1,6 +1,6 @@
 {
   "hint_title": "Run a shell command",
-  "hint_subtitle": "Type a command after /sh and press Enter to run it in the background",
+  "hint_subtitle": "Type a command after /cmd and press Enter to run it in the background",
   "history_subtitle": "Recent command",
   "run_start_failed": "Command failed to start",
   "run_subtitle": "Runs in the background",
@@ -12,7 +12,7 @@
       "label": "Default Workspace"
     },
     "snippets": {
-      "description": "Commands shown when /sh is empty. Each entry is one command.",
+      "description": "Commands shown when /cmd is empty. Each entry is one command.",
       "label": "Snippets"
     }
   },

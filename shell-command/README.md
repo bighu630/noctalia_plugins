@@ -2,7 +2,7 @@
 
 Run shell commands from the launcher in the **background** — no terminal window is opened.
 
-Type `/sh <command>` in the launcher and press Enter. The command is launched detached
+Type `/cmd <command>` in the launcher and press Enter. The command is launched detached
 (fire-and-forget) and keeps running even after Noctalia exits.
 
 ## How it works
@@ -20,16 +20,16 @@ Type `/sh <command>` in the launcher and press Enter. The command is launched de
 ## Usage
 
 ```
-/sh <command>
+/cmd <command>
 ```
 
 Examples:
 
 | Input | Effect |
 | --- | --- |
-| `/sh ls` | Lists files in the default workspace (or the shell's current directory) |
-| `/sh cd ~/proj && git status` | Changes to `~/proj` first, then runs `git status` there |
-| `/sh cd ~/proj && cargo build` | Long-running build, detached — keep using your desktop |
+| `/cmd ls` | Lists files in the default workspace (or the shell's current directory) |
+| `/cmd cd ~/proj && git status` | Changes to `~/proj` first, then runs `git status` there |
+| `/cmd cd ~/proj && cargo build` | Long-running build, detached — keep using your desktop |
 
 > Note: a bare `cd <dir>` (without `&& <command>`) has no visible effect — the
 > background shell exits immediately after changing directory. Combine navigation
@@ -47,16 +47,16 @@ work), so navigation and a command can be combined in one launch. Otherwise, whe
   snap-applied to the run entry; multiple candidates are offered as suggestions.
 - **Command history** — every executed command is recorded (most-recent first,
   deduplicated, capped at 100 entries) in the plugin's data directory
-  (`noctalia.pluginDataDir()` / `history` file). Recent commands appear when `/sh` is
+  (`noctalia.pluginDataDir()` / `history` file). Recent commands appear when `/cmd` is
   empty and as you retype prefixes.
-- **Snippets** — configure frequently used commands; they are shown when `/sh` is empty
+- **Snippets** — configure frequently used commands; they are shown when `/cmd` is empty
   and can be filled into the input with Enter.
 
 ## Settings
 
 - **Default Workspace** — working directory commands run in. Leave empty to use the
   shell's current directory.
-- **Snippets** — commands shown when `/sh` is empty. Each entry is one command.
+- **Snippets** — commands shown when `/cmd` is empty. Each entry is one command.
 
 ## Notes
 
