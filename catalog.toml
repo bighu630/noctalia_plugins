@@ -29,8 +29,8 @@ tags = ["bar", "utility"]
 [[plugin]]
 id = "bighu630/shell-command"
 name = "Shell Command"
-version = "0.2.0"
-updated_at = 1786799469
+version = "0.3.0"
+updated_at = 1786801532
 added_at = 1786799469
 author = "Bighu630"
 license = "MIT"
