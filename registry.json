@@ -18,20 +18,21 @@
       "lastUpdated": "2026-03-28T22:30:39+08:00"
     },
     {
-      "id": "nc-screen-recorder",
-      "name": "Screen Recorder 2",
-      "version": "1.0.3",
+      "id": "bighu630/nc-screen-recorder",
+      "name": "Screen Recorder",
+      "version": "2.0.0",
       "official": false,
       "author": "Bighu630",
-      "description": "Screen recording plugin powered by gpu-screen-recorder with audio, quality presets, and portal-based region selection.",
+      "description": "Screen recording and streaming powered by gpu-screen-recorder, with slurp-based region selection.",
       "repository": "https://github.com/bighu630/noctalia_plugins",
       "license": "MIT",
+      "plugin_api": 26,
       "tags": [
         "Bar",
         "Panel",
         "Utility"
       ],
-      "lastUpdated": "2026-03-31T23:08:01-07:00"
+      "lastUpdated": "2026-08-24T20:47:39+08:00"
     },
     {
       "id": "bighu630/global-menu",

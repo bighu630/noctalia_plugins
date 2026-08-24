@@ -18,7 +18,7 @@
     "audioBoth": "两者",
     "recordingTarget": "录制目标",
     "targetRegion": "区域选择",
-    "targetFullScreen": "全屏",
+    "targetFullscreen": "全屏",
     "codec": "编码器",
     "codecAuto": "自动",
     "quality": "质量",
@@ -29,6 +29,7 @@
   "settings": {
     "saveDirectory": {
       "label": "保存目录",
+      "description": "录制文件的保存文件夹",
       "placeholder": "~/Videos"
     },
     "filePattern": {
@@ -37,10 +38,54 @@
       "placeholder": "recording_{datetime}"
     },
     "videoFormat": {
-      "label": "默认格式"
+      "label": "视频格式",
+      "description": "录制文件的容器格式",
+      "options": {
+        "mp4": "MP4",
+        "mkv": "MKV",
+        "webm": "WebM"
+      }
     },
     "codec": {
-      "label": "默认编码器"
+      "label": "编码器",
+      "description": "录制使用的视频编码器",
+      "options": {
+        "auto": "自动",
+        "h264": "H.264",
+        "hevc": "HEVC (H.265)",
+        "av1": "AV1",
+        "vp9": "VP9"
+      }
+    },
+    "quality": {
+      "label": "质量",
+      "description": "录制质量预设",
+      "options": {
+        "medium": "中",
+        "high": "高",
+        "very_high": "很高",
+        "ultra": "极高"
+      }
+    },
+    "framerate": {
+      "label": "帧率",
+      "description": "录制帧率（FPS）",
+      "options": {
+        "30": "30 帧",
+        "60": "60 帧",
+        "120": "120 帧",
+        "144": "144 帧"
+      }
+    },
+    "audioSource": {
+      "label": "音频源",
+      "description": "录制中包含的音频轨道",
+      "options": {
+        "none": "无",
+        "mic": "麦克风",
+        "desktop": "桌面音频",
+        "both": "两者"
+      }
     },
     "streamDestinations": {
       "label": "推流目标",
@@ -49,6 +94,10 @@
       "urlPlaceholder": "推流地址（如：rtmp://live.twitch.tv/app/...）",
       "addButton": "添加目标",
       "removeButton": "删除"
+    },
+    "streamDestination": {
+      "label": "推流到",
+      "description": "推流模式下使用的推流地址"
     }
   },
   "notification": {
@@ -59,6 +108,9 @@
     "failedToCreateDirectory": "创建保存目录失败",
     "openFolder": "打开所在文件夹",
     "streamingStarted": "推流已开始",
-    "streamingStopped": "推流已停止"
+    "streamingStopped": "推流已停止",
+    "regionSelectionCancelled": "已取消区域选择",
+    "startFailed": "启动录制失败",
+    "notRecording": "当前没有正在进行的录制"
   }
 }

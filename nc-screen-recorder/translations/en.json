@@ -17,8 +17,8 @@
     "audioDesktop": "Desktop Audio",
     "audioBoth": "Both",
     "recordingTarget": "Recording Target",
-    "targetRegion": "Region (Portal)",
-    "targetFullScreen": "Full Screen",
+    "targetRegion": "Region (slurp)",
+    "targetFullscreen": "Full Screen",
     "codec": "Codec",
     "codecAuto": "Auto",
     "quality": "Quality",
@@ -29,6 +29,7 @@
   "settings": {
     "saveDirectory": {
       "label": "Save Directory",
+      "description": "Folder where recordings are saved",
       "placeholder": "~/Videos"
     },
     "filePattern": {
@@ -37,10 +38,54 @@
       "placeholder": "recording_{datetime}"
     },
     "videoFormat": {
-      "label": "Default Format"
+      "label": "Video Format",
+      "description": "Container format for recordings",
+      "options": {
+        "mp4": "MP4",
+        "mkv": "MKV",
+        "webm": "WebM"
+      }
     },
     "codec": {
-      "label": "Default Codec"
+      "label": "Codec",
+      "description": "Video codec used for recording",
+      "options": {
+        "auto": "Auto",
+        "h264": "H.264",
+        "hevc": "HEVC (H.265)",
+        "av1": "AV1",
+        "vp9": "VP9"
+      }
+    },
+    "quality": {
+      "label": "Quality",
+      "description": "Recording quality preset",
+      "options": {
+        "medium": "Medium",
+        "high": "High",
+        "very_high": "Very High",
+        "ultra": "Ultra"
+      }
+    },
+    "framerate": {
+      "label": "Framerate",
+      "description": "Recording framerate in FPS",
+      "options": {
+        "30": "30 FPS",
+        "60": "60 FPS",
+        "120": "120 FPS",
+        "144": "144 FPS"
+      }
+    },
+    "audioSource": {
+      "label": "Audio Source",
+      "description": "Audio track to include in the recording",
+      "options": {
+        "none": "None",
+        "mic": "Microphone",
+        "desktop": "Desktop Audio",
+        "both": "Both"
+      }
     },
     "streamDestinations": {
       "label": "Stream Destinations",
@@ -49,6 +94,10 @@
       "urlPlaceholder": "Stream URL (e.g., rtmp://live.twitch.tv/app/...)",
       "addButton": "Add Destination",
       "removeButton": "Remove"
+    },
+    "streamDestination": {
+      "label": "Stream To",
+      "description": "Streaming destination used for streaming mode"
     }
   },
   "notification": {
@@ -59,6 +108,9 @@
     "failedToCreateDirectory": "Failed to create save directory",
     "openFolder": "Open folder",
     "streamingStarted": "Streaming started",
-    "streamingStopped": "Streaming stopped"
+    "streamingStopped": "Streaming stopped",
+    "regionSelectionCancelled": "Region selection cancelled",
+    "startFailed": "Failed to start recording",
+    "notRecording": "Not recording"
   }
 }

@@ -27,6 +27,18 @@ plugin_api = 14
 tags = ["bar", "utility"]
 
 [[plugin]]
+id = "bighu630/nc-screen-recorder"
+name = "Screen Recorder"
+version = "2.0.0"
+updated_at = 1787575659
+added_at = 1787575659
+author = "Bighu630"
+license = "MIT"
+description = "Screen recording and streaming powered by gpu-screen-recorder, with slurp-based region selection."
+plugin_api = 26
+tags = ["bar", "panel", "utility"]
+
+[[plugin]]
 id = "bighu630/shell-command"
 name = "Shell Command"
 version = "0.3.0"

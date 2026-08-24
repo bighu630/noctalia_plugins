@@ -1,0 +1,120 @@
+id = "bighu630/nc-screen-recorder"
+name = "Screen Recorder"
+version = "2.0.0"
+plugin_api = 26
+author = "Bighu630"
+license = "MIT"
+description = "Screen recording and streaming powered by gpu-screen-recorder, with slurp-based region selection."
+tags = ["bar", "panel", "utility"]
+dependencies = ["gpu-screen-recorder", "slurp"]
+
+[[service]]
+id = "recorder_service"
+entry = "service.luau"
+
+[[widget]]
+id = "recorder"
+entry = "widget.luau"
+
+[[panel]]
+id = "main"
+entry = "panel.luau"
+width = 380
+height = 600
+placement = "attached"
+position = "auto"
+open_near_click = true
+dismiss_on_outside_click = true
+
+  [[setting]]
+  key = "saveDirectory"
+  type = "folder"
+  label_key = "settings.saveDirectory.label"
+  description_key = "settings.saveDirectory.description"
+  default = "~/Videos"
+
+  [[setting]]
+  key = "filePattern"
+  type = "string"
+  label_key = "settings.filePattern.label"
+  description_key = "settings.filePattern.description"
+  default = "recording_{datetime}"
+
+  [[setting]]
+  key = "videoFormat"
+  type = "select"
+  label_key = "settings.videoFormat.label"
+  description_key = "settings.videoFormat.description"
+  default = "mp4"
+  options = [
+    { value = "mp4", label_key = "settings.videoFormat.options.mp4" },
+    { value = "mkv", label_key = "settings.videoFormat.options.mkv" },
+    { value = "webm", label_key = "settings.videoFormat.options.webm" }
+  ]
+
+  [[setting]]
+  key = "codec"
+  type = "select"
+  label_key = "settings.codec.label"
+  description_key = "settings.codec.description"
+  default = "auto"
+  options = [
+    { value = "auto", label_key = "settings.codec.options.auto" },
+    { value = "h264", label_key = "settings.codec.options.h264" },
+    { value = "hevc", label_key = "settings.codec.options.hevc" },
+    { value = "av1", label_key = "settings.codec.options.av1" },
+    { value = "vp9", label_key = "settings.codec.options.vp9" }
+  ]
+
+  [[setting]]
+  key = "quality"
+  type = "select"
+  label_key = "settings.quality.label"
+  description_key = "settings.quality.description"
+  default = "high"
+  options = [
+    { value = "medium", label_key = "settings.quality.options.medium" },
+    { value = "high", label_key = "settings.quality.options.high" },
+    { value = "very_high", label_key = "settings.quality.options.very_high" },
+    { value = "ultra", label_key = "settings.quality.options.ultra" }
+  ]
+
+  [[setting]]
+  key = "framerate"
+  type = "select"
+  label_key = "settings.framerate.label"
+  description_key = "settings.framerate.description"
+  default = "60"
+  options = [
+    { value = "30", label_key = "settings.framerate.options.30" },
+    { value = "60", label_key = "settings.framerate.options.60" },
+    { value = "120", label_key = "settings.framerate.options.120" },
+    { value = "144", label_key = "settings.framerate.options.144" }
+  ]
+
+  [[setting]]
+  key = "audioSource"
+  type = "select"
+  label_key = "settings.audioSource.label"
+  description_key = "settings.audioSource.description"
+  default = "none"
+  options = [
+    { value = "none", label_key = "settings.audioSource.options.none" },
+    { value = "mic", label_key = "settings.audioSource.options.mic" },
+    { value = "desktop", label_key = "settings.audioSource.options.desktop" },
+    { value = "both", label_key = "settings.audioSource.options.both" }
+  ]
+
+  [[setting]]
+  key = "streamDestinations"
+  type = "string_map"
+  label_key = "settings.streamDestinations.label"
+  description_key = "settings.streamDestinations.description"
+  default = {}
+
+  [[setting]]
+  key = "streamDestination"
+  type = "string"
+  label_key = "settings.streamDestination.label"
+  description_key = "settings.streamDestination.description"
+  default = ""

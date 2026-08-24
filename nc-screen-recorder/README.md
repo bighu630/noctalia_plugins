@@ -1,57 +1,65 @@
-# Screen Recorder Plugin
+# Screen Recorder (nc-screen-recorder)
 
-A Noctalia Shell plugin for screen recording powered by [wl-screenrec](https://github.com/russelltg/wl-screenrec).
+Noctalia v5 plugin for screen recording and streaming, powered by
+[gpu-screen-recorder](https://github.com/dec05eba/gpu-screen-recorder) with
+[slurp](https://github.com/emersion/slurp)-based region selection.
 
-## Features
-
-- **Bar Widget**: Shows recording status with video/audio indicators and pulse animation
-- **Recording Controls**: Start/stop full-screen or region recording
-- **Region Selection**: Interactive area selection via `slurp`
-- **Audio Recording**: Toggle system audio capture (PipeWire)
-- **Multi-Monitor**: Select which monitor to record
-- **Format & Codec**: Configure container format (MP4/MKV/WebM) and encoder (H.264/H.265/VP8/VP9/AV1)
-- **Bitrate Control**: Adjustable video bitrate
-- **Custom Output**: Configurable save directory and file naming pattern
+- **ID**: `bighu630/nc-screen-recorder`
+- **Version**: 2.0.0 (plugin API 26)
+- **License**: MIT
+- **Tags**: bar, panel, utility
 
 ## Dependencies
 
-- `wl-screenrec` — screen recording backend
-- `slurp` — interactive region selection (optional, for region recording)
+- `gpu-screen-recorder` — actual recording/streaming backend
+- `slurp` — interactive region selection (`slurp -f "%wx%h+%x+%y"`, output is
+  fed directly to gpu-screen-recorder's `-region WxH+X+Y`, no coordinate
+  conversion needed)
 
-## Installation
+## Architecture
 
-Copy this plugin directory to your Noctalia plugins folder, or install via the plugin registry.
+The plugin is split into three entries that communicate through the state
+channel (`rec_state` / `rec_options` / `rec_cmd`, JSON-string payloads):
 
-## Usage
+| Entry | File | Responsibility |
+|---|---|---|
+| `[[service]] recorder_service` | `service.luau` | Owns the recorder process and the state machine; sole writer of state. Builds gpu-screen-recorder commands, handles slurp region selection, pidfile/session-based stop and restart recovery, and persists option overrides. |
+| `[[widget]] recorder` | `widget.luau` | Status-bar capsule: idle glyph in normal color, static red dot + elapsed timer + mic glyph while recording. Left click toggles the panel, right click opens plugin settings. |
+| `[[panel]] main` | `panel.luau` | Operation UI anchored below the widget (380×600, attached): status row, start/stop button, six dropdowns (audio source, target, codec, quality, framerate, stream destination), settings entry. |
 
-1. Add the **Screen Recorder** widget to your bar
-2. **Left-click** the widget to open the recording menu
-3. Configure format, codec, bitrate, monitor, and audio as needed
-4. Click **Start Recording** to begin
-5. Click **Stop Recording** to finish — the file is saved to your configured directory
-6. For region recording, click **Select Region** first, draw the area, then start recording
+Recording lifecycle: start resolves the target (`region` → slurp, Esc/empty →
+cancelled toast; `fullscreen` → `-w screen`; otherwise `-w <monitor>`), spawns a
+wrapper script via `runStream` that records the pid to `recorder.pid`. Stop sends
+`SIGINT` through the pidfile. Exit code `0`/`255` counts as success (file saved /
+stream stopped), anything else raises an error notification. On service startup,
+a surviving pid in `session.json` resumes the recording state; otherwise state is
+cleaned up back to idle.
 
-### File Naming
+## Settings
 
-The default pattern is `recording_{datetime}`, which produces filenames like:
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `saveDirectory` | folder | `~/Videos` | Folder where recordings are saved |
+| `filePattern` | string | `recording_{datetime}` | Output file name pattern; `{datetime}` expands to a timestamp |
+| `videoFormat` | select (`mp4`/`mkv`/`webm`) | `mp4` | Container format |
+| `codec` | select (`auto`/`h264`/`hevc`/`av1`/`vp9`) | `auto` | Video codec |
+| `quality` | select (`medium`/`high`/`very_high`/`ultra`) | `high` | Quality preset |
+| `framerate` | select (`30`/`60`/`120`/`144`) | `60` | Recording FPS |
+| `audioSource` | select (`none`/`mic`/`desktop`/`both`) | `none` | Audio track to record |
+| `streamDestinations` | string_map | `{}` | Named RTMP/RTSP streaming destinations |
+| `streamDestination` | string | `""` | Destination used in streaming mode |
 
-```
-recording_2026-03-29_14-30-00.mp4
-```
+Changes made inside the panel are applied immediately by writing overrides via
+the service; declarative settings act as defaults.
 
-You can customize the pattern in the panel or settings. The `{datetime}` placeholder is replaced with a `yyyy-MM-dd_HH-mm-ss` timestamp.
+## Manual verification checklist (after install)
 
-### IPC Commands
-
-```bash
-qs -c noctalia-shell ipc call plugin:wl-screenrec startRecording
-qs -c noctalia-shell ipc call plugin:wl-screenrec stopRecording
-qs -c noctalia-shell ipc call plugin:wl-screenrec selectRegion
-qs -c noctalia-shell ipc call plugin:wl-screenrec clearRegion
-qs -c noctalia-shell ipc call plugin:wl-screenrec toggle
-qs -c noctalia-shell ipc call plugin:wl-screenrec startRegionRecording
-```
-
-## License
-
-MIT
+1. Capsule shows both states correctly: idle glyph normally, red dot + timer
+   (+ mic icon when audio is on) while recording.
+2. Left click opens the panel attached right below the widget icon.
+3. Region recording produces a valid video file (select "Region (slurp)",
+   drag a rectangle, record, stop).
+4. Stopping with SIGINT ends gracefully — exit code 0/255 — and the file is
+   saved with a success notification.
+5. After restarting (host or plugin reload) no stale recording state remains:
+   if the old process is dead the widget returns to idle.
