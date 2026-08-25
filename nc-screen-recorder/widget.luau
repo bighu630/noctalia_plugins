@@ -81,7 +81,7 @@ local function refresh()
       glyphName = "speaker"
     end
     barWidget.setGlyph(glyphName)
-    barWidget.setGlyphColor("#000000") -- 固定黑色图标（亮/暗主题一致），红底胶囊上保证可见
+    barWidget.setGlyphColor("error") -- 固定红色图标（亮/暗主题一致）
     barWidget.setText(formatElapsed(elapsedSeconds()))
     barWidget.setColor("error") -- 录制态：红色胶囊本体（error）
   else
