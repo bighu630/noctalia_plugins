@@ -94,7 +94,7 @@ local function selectRow(props)
       options = props.labels,
       selectedIndex = selectedIndex,
       enabled = props.enabled,
-      controlSize = "md",
+      controlSize = "sm", -- 紧凑高度（保留用户手调的 sm）
       width = SELECT_WIDTH,
       onChange = function(index, _label)
         local v = props.values[(math.floor(tonumber(index) or -1)) + 1]
