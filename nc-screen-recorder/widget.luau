@@ -1,15 +1,14 @@
 --!nonstrict
 -- nc-screen-recorder v5 状态栏 widget：两态胶囊渲染。
 --
--- 渲染机制（Noctalia v5）：命令式渲染——调用 barWidget.render(ui树) 推送 UI 树，
--- state watch 变化或定时 tick 时重建并推送（global-menu 模式）。
+-- 渲染机制：**纯命令式 API**（setGlyph/setText/setColor…）。录制态背景色经
+-- barWidget.setColor("error") 直接作用于宿主胶囊本体（圆角造型由宿主负责），
+-- 不用 ui.row{fill=...}（那是内容后面的方形底块，不是胶囊）。
+-- 停止后以 setColor("") 恢复默认胶囊配色（udiskie 插件同款用法）。
 --
 -- 两态：
---   idle      普通胶囊（不设背景色）+ circle glyph + tooltip「屏幕录制」；
---             低频 setUpdateInterval(5000) 仅作兜底重渲染。
---   recording 背景 error 色；静态白点（用户决策：不做闪烁动画）+
---             白色粗体计时文本（由 now - rec_state.startTime 计算）+
---             音频开启时的麦克风 glyph；
+--   idle      circle 图标（默认前景色）+ 无文本 + 默认胶囊；低频兜底重渲染。
+--   recording error 色胶囊 + 计时文本（on_error 色）+ 麦克风/circle 图标；
 --             setUpdateInterval(1000) 驱动秒级计时刷新。
 
 local state = noctalia.state
@@ -19,7 +18,6 @@ local PANEL_ID = PLUGIN_ID .. ":main"
 
 local IDLE_INTERVAL_MS = 5000
 local RECORDING_INTERVAL_MS = 1000
-local WHITE = "#ffffff"
 
 -- 进程内状态快照（rec_state/rec_options 均为 JSON 字符串，契约 §1）
 local recState = nil   -- {isRecording,startTime,file,streaming}
@@ -70,31 +68,22 @@ end
 
 -- ---------------------------------------------------------------- 渲染
 
-local function buildTree()
-  if isRecording() then
-    local children = {
-      -- 静态白点（明确不做闪烁）：小号实心圆字符即可，避免引入帧动画
-      ui.label({ text = "●", color = WHITE, fontSize = 13 }),
-      ui.label({ text = formatElapsed(elapsedSeconds()), color = WHITE, fontWeight = "bold" }),
-    }
-    local a = audioSource()
-    if a ~= "" and a ~= "none" then
-      children[#children + 1] = ui.glyph({ name = "microphone", color = WHITE, size = 14 })
-    end
-    -- 录制态：error 色背景胶囊（ui.row 支持 fill 主题 token）
-    return ui.row({ gap = 6, paddingH = 10, align = "center", fill = "error" }, children)
-  end
-
-  -- idle 态：普通胶囊（不设背景色，跟随主题默认）
-  return ui.row({ gap = 6, paddingH = 8, align = "center" }, {
-    ui.glyph({ name = "circle", size = 16 }),
-  })
-end
-
+-- 纯命令式渲染：颜色作用于胶囊本体，圆角/内边距造型全部由宿主管理。
 local function refresh()
-  barWidget.render(buildTree())
-  -- 说明：一旦调用 render()，命令式 setText/setGlyph 即失效；tooltip 为独立属性仍可设置。
-  -- 若宿主版本在 render 后忽略 setTooltip，仅悬停提示消失，不影响功能。
+  if isRecording() then
+    local a = audioSource()
+    local hasAudio = a ~= "" and a ~= "none"
+    -- 有音频 → 麦克风图标；否则保留 circle 作录制指示点（静态，不闪烁）
+    barWidget.setGlyph(hasAudio and "microphone" or "circle")
+    barWidget.setGlyphColor("on_error")
+    barWidget.setText(formatElapsed(elapsedSeconds()))
+    barWidget.setColor("error") -- 录制态：红色胶囊本体
+  else
+    barWidget.setGlyph("circle")
+    barWidget.setGlyphColor("on_surface_variant")
+    barWidget.setText("")
+    barWidget.setColor("") -- 停止后恢复默认胶囊配色
+  end
   barWidget.setTooltip(isRecording()
     and noctalia.tr("widget.tooltipRecording")
     or noctalia.tr("widget.tooltip"))
