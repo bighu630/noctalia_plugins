@@ -251,8 +251,6 @@ local function buildSelects(recording)
     end,
   })
 
-  rows[#rows + 1] = streamRow(not recording)
-
   rows[#rows + 1] = selectRow({
     label = noctalia.tr("panel.videoFormat"),
     values = { "mp4", "mkv", "webm", "gif" },
@@ -268,6 +266,8 @@ local function buildSelects(recording)
       sendCmd({ op = "setOption", key = "videoFormat", value = v })
     end,
   })
+
+  rows[#rows + 1] = streamRow(not recording)
 
   return ui.column({ gap = 10 }, rows)
 end
