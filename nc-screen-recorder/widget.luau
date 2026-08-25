@@ -81,9 +81,9 @@ local function refresh()
       glyphName = "speaker"
     end
     barWidget.setGlyph(glyphName)
-    barWidget.setGlyphColor("on_error") -- error 背景上的前景必须用 on_error，保证明/暗主题对比度
+    barWidget.setGlyphColor("#000000") -- 固定黑色图标（亮/暗主题一致），红底胶囊上保证可见
     barWidget.setText(formatElapsed(elapsedSeconds()))
-    barWidget.setColor("error") -- 录制态：红色胶囊本体
+    barWidget.setColor("error") -- 录制态：红色胶囊本体（error）
   else
     barWidget.setGlyph("circle")
     barWidget.setGlyphColor("on_surface") -- idle 胶囊为默认 surface 背景，用 on_surface 比 on_surface_variant 对比度更高，明/暗主题均可见
