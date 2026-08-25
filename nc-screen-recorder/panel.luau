@@ -15,7 +15,6 @@
 local state = noctalia.state
 
 local ERROR_COLOR = "error"
-local LABEL_WIDTH = 110
 
 -- 进程内状态快照（rec_state/rec_options 均为 JSON 字符串，契约 §1）
 local recState = nil
@@ -73,7 +72,9 @@ end
 
 -- ---------------------------------------------------------------- 控件构建
 
--- 构建带左侧标签的 ui.select 行。
+-- 构建表单行：标签在上方、下拉占满整行（wl-screen-mirror 的 section 惯用模式）。
+-- 不用「固定宽标签 + 横排」——label 的 width 属性不可靠且易溢出面板宽度、
+-- 各行标签自然宽度不一导致下拉无法对齐。
 -- props: { label=..., values={...}, labels={...}, current=..., enabled=bool,
 --          onPick=function(value) end }
 -- onChange 收到 (index, label)，index 为 0 基（官方示例映射 values[index + 1]）；
@@ -86,13 +87,14 @@ local function selectRow(props)
       break
     end
   end
-  return ui.row({ gap = 8, align = "center" }, {
-    ui.label({ text = props.label, color = "on_surface_variant", width = LABEL_WIDTH }),
+  return ui.column({ gap = 4 }, {
+    ui.label({ text = props.label, fontSize = 11, color = "on_surface_variant" }),
     ui.select({
       options = props.labels,
       selectedIndex = selectedIndex,
       enabled = props.enabled,
-      flexGrow = 1,
+      controlSize = "md",
+      flexGrow = 1, -- 占满面板内容宽，所有下拉左右边缘对齐
       onChange = function(index, _label)
         local v = props.values[(math.floor(tonumber(index) or -1)) + 1]
         if v ~= nil then props.onPick(v) end
