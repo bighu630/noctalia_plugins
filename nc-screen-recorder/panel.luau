@@ -1,9 +1,8 @@
 --!nonstrict
--- nc-screen-recorder v5 下拉面板：状态行 / 开始停止大按钮 / 7 个下拉 / 设置入口。
+-- nc-screen-recorder v5 下拉面板：开始停止大按钮 / 7 个下拉 / 设置入口。
 --
 -- 渲染机制：onOpen(context) 里 panel.render(ui树) 推送全树；watch rec_state/rec_options
--- 变化即重渲染。状态行不展示计时，无需秒级 tick（setWantsSecondTicks 始终为 false，
--- onClose 再显式取消一次）。
+-- 变化即重渲染（下拉列表本身静止，仅按钮随录制态切换）。无需秒级 tick。
 --
 -- 契约要点：
 --   * rec_cmd 的值必须是 JSON 字符串（noctalia.json.encode 后 state.set）。
@@ -13,8 +12,6 @@
 --     {name,description,width,height,x,y,scale,focused}，取 name 作为 -w 参数。
 
 local state = noctalia.state
-
-local ERROR_COLOR = "error"
 
 -- 进程内状态快照（rec_state/rec_options 均为 JSON 字符串，契约 §1）
 local recState = nil
@@ -278,46 +275,15 @@ local function buildTree()
   local selects = buildSelects(recording)
   local settingsBtn = settingsButton()
 
-  -- 状态行（仅录制中显示）：红点(error 色) + 「录制中」+ 音频图标(mic/speaker)，不展示计时
-  if recording then
-    local a = optionValue("audioSource", "none")
-    local statusChildren = {
-      ui.label({ text = "●", color = ERROR_COLOR, fontSize = 14 }),
-      ui.label({ text = noctalia.tr("panel.recording"), color = ERROR_COLOR, fontWeight = "bold" }),
-    }
-    if a == "mic" or a == "both" then
-      statusChildren[#statusChildren + 1] = ui.glyph({ name = "microphone", color = ERROR_COLOR, size = 14 })
-    elseif a == "desktop" then
-      statusChildren[#statusChildren + 1] = ui.glyph({ name = "speaker", color = ERROR_COLOR, size = 14 })
-    end
-
-    -- 大按钮：录制中 = destructive「停止录制」
-    return ui.column({ padding = 16, gap = 12 }, {
-      ui.row({ gap = 10, align = "center" }, statusChildren),
-      ui.button({
-        text = noctalia.tr("panel.stopRecording"),
-        variant = "destructive",
-        contentAlign = "center",
-        flexGrow = 1,
-        onClick = function()
-          sendCmd({ op = "stop" })
-        end,
-      }),
-      selects,
-      settingsBtn,
-    })
-  end
-
-  -- 未录制：隐藏状态行；大按钮 = primary「开始录制」（target 由 service 解析，含 slurp 流程）
   return ui.column({ padding = 16, gap = 12 }, {
     ui.button({
-      text = noctalia.tr("panel.startRecording"),
-      variant = "primary",
+      text = recording and noctalia.tr("panel.stopRecording") or noctalia.tr("panel.startRecording"),
+      variant = recording and "destructive" or "primary",
       contentAlign = "center",
       flexGrow = 1,
       onClick = function()
-        sendCmd({ op = "start" })
-        panel.close() -- 点击开始后自动收起面板（选区/录制无需面板停留）
+        sendCmd({ op = recording and "stop" or "start" })
+        if not recording then panel.close() end -- 开始录制后自动收起；停止时保持面板便于查看
       end,
     }),
     selects,
