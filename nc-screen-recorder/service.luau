@@ -36,7 +36,8 @@ local OPTION_KEYS = { "audioSource", "target", "codec", "quality", "framerate", 
 
 -- 进程内状态
 local recActive = false          -- 已确认 pid、处于录制中
-local starting = false           -- 已发起启动、尚未确认 pid
+local prelaunch = false          -- 已受理 start、正在 slurp/mkdir，尚未拉起 gsr
+local starting = false           -- 已发起启动（runStream 成功）、尚未确认 pid
 local pendingStop = false        -- starting 态下收到停止请求、pidfile 尚未落地（M2）
 local launchTime = 0             -- 启动时间戳（用于 pid 确认超时）
 local PID_CONFIRM_TIMEOUT_MS = 10000
@@ -133,6 +134,8 @@ local function finishRecording(exitCode)
   local filePath = session.file
   starting = false
   recActive = false
+  prelaunch = false -- 防泄漏（正常路径下已为 false）
+  pendingStop = false
   session = { startTime = 0, file = "", streaming = false }
   clearSessionFiles()
   broadcastIdle()
@@ -239,11 +242,13 @@ local function launchRecorder(windowArg)
   local function doLaunch()
     local ok = noctalia.runStream({ "bash", "-c", buildWrapper(args) }, handleGsrLine)
     if not ok then
+      prelaunch = false
       starting = false
       noctalia.notifyError(noctalia.tr("notification.startFailed"))
       return
     end
     -- pid 由包装脚本异步写入，等待 update() 心跳确认后再写 session.json
+    prelaunch = false
     starting = true
     launchTime = nowMs()
     session = {
@@ -257,7 +262,9 @@ local function launchRecorder(windowArg)
     local dir = filePath:match("^(.*)/[^/]+$") or "."
     noctalia.runAsync({ "mkdir", "-p", dir }, function(result)
       if not result or result.exitCode ~= 0 then
+        prelaunch = false
         starting = false
+        pendingStop = false
         noctalia.notifyError(noctalia.tr("notification.failedToCreateDirectory"))
         return
       end
@@ -269,8 +276,10 @@ local function launchRecorder(windowArg)
 end
 
 local function startRecording(cmd)
-  if recActive or starting then return end
-  starting = true
+  if recActive or starting or prelaunch then return end
+  prelaunch = true -- 受理启动；slurp/mkdir 期间不进入 starting 态，update() 超时清场不可达
+  -- 注意：starting 留待 doLaunch() 成功时才置 true（同时设 launchTime），
+  -- 否则 slurp 期间心跳会因 launchTime=0 误触超时清场。
 
   local target = tostring(cmd.target or effective("target") or DEFAULTS.target)
 
@@ -279,6 +288,7 @@ local function startRecording(cmd)
     noctalia.runAsync({ "slurp", "-f", "%wx%h+%x+%y" }, function(result)
       local geom = result and trim(result.stdout) or ""
       if not result or result.exitCode ~= 0 or geom == "" then
+        prelaunch = false
         starting = false
         pendingStop = false -- 复位：slurp 期间取消不应把停止请求残留到下次启动（复审建议）
         noctalia.notify(noctalia.tr("notification.regionSelectionCancelled"))
@@ -299,12 +309,16 @@ end
 local function confirmDeadCleanup()
   starting = false
   recActive = false
+  prelaunch = false -- 防泄漏（正常路径下已为 false）
+  pendingStop = false
   session = { startTime = 0, file = "", streaming = false }
   clearSessionFiles()
   broadcastIdle()
   noctalia.notify(noctalia.tr("notification.notRecording"))
 end
 
+-- 注：prelaunch 阶段（slurp/mkdir 进行中）面板仍显示 Start 按钮、rec_state 为 idle，
+-- stopRecording 在该阶段不可达，故无需处理 prelaunch。
 local function stopRecording()
   if not recActive and not starting then
     confirmDeadCleanup()
@@ -429,6 +443,7 @@ function update()
       end
     elseif nowMs() - launchTime > PID_CONFIRM_TIMEOUT_MS then
       -- gsr 秒退且 __GSR_EXIT__ 行丢失：超时放弃，清场（含挂起的停止标记）
+      prelaunch = false
       starting = false
       pendingStop = false
       session = { startTime = 0, file = "", streaming = false }
