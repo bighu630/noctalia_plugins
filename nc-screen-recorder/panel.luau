@@ -72,13 +72,14 @@ end
 
 -- ---------------------------------------------------------------- 控件构建
 
--- 构建表单行：标签在上方、下拉占满整行（wl-screen-mirror 的 section 惯用模式）。
--- 不用「固定宽标签 + 横排」——label 的 width 属性不可靠且易溢出面板宽度、
--- 各行标签自然宽度不一导致下拉无法对齐。
+-- 构建表单行：左右结构——左侧标签（flexGrow=1 占据剩余宽度），右侧固定宽选项框。
+-- 标签自然伸展把 select 统一推到右缘：所有下拉右对齐且不溢出。
+-- 不用 label 固定宽（不可靠，是之前错位/溢出的根因）。
 -- props: { label=..., values={...}, labels={...}, current=..., enabled=bool,
 --          onPick=function(value) end }
 -- onChange 收到 (index, label)，index 为 0 基（官方示例映射 values[index + 1]）；
 -- ui.select 支持 enabled 参数（declarative-ui 文档确认），录制中禁用。
+local SELECT_WIDTH = 180 -- 面板内容宽 348（380-2x16），减去标签区留足余量不溢出
 local function selectRow(props)
   local selectedIndex = 0
   for i, v in ipairs(props.values) do
@@ -87,14 +88,14 @@ local function selectRow(props)
       break
     end
   end
-  return ui.column({ gap = 4 }, {
-    ui.label({ text = props.label, fontSize = 11, color = "on_surface_variant" }),
+  return ui.row({ gap = 8, align = "center" }, {
+    ui.label({ text = props.label, fontSize = 12, color = "on_surface_variant", flexGrow = 1 }),
     ui.select({
       options = props.labels,
       selectedIndex = selectedIndex,
       enabled = props.enabled,
-      controlSize = "sm", -- 紧凑高度（用户反馈：下拉偏高）
-      flexGrow = 1, -- 占满面板内容宽，所有下拉左右边缘对齐
+      controlSize = "md",
+      width = SELECT_WIDTH,
       onChange = function(index, _label)
         local v = props.values[(math.floor(tonumber(index) or -1)) + 1]
         if v ~= nil then props.onPick(v) end
@@ -251,6 +252,22 @@ local function buildSelects(recording)
   })
 
   rows[#rows + 1] = streamRow(not recording)
+
+  rows[#rows + 1] = selectRow({
+    label = noctalia.tr("panel.videoFormat"),
+    values = { "mp4", "mkv", "webm", "gif" },
+    labels = {
+      noctalia.tr("settings.videoFormat.options.mp4"),
+      noctalia.tr("settings.videoFormat.options.mkv"),
+      noctalia.tr("settings.videoFormat.options.webm"),
+      noctalia.tr("settings.videoFormat.options.gif"),
+    },
+    current = optionValue("videoFormat", "mp4"),
+    enabled = not recording,
+    onPick = function(v)
+      sendCmd({ op = "setOption", key = "videoFormat", value = v })
+    end,
+  })
 
   return ui.column({ gap = 10 }, rows)
 end

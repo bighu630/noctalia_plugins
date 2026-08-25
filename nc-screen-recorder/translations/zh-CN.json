@@ -24,6 +24,7 @@
     "quality": "质量",
     "framerate": "帧率",
     "streamDestination": "推流到",
+    "videoFormat": "格式",
     "noStream": "不推流（保存到文件）"
   },
   "settings": {
