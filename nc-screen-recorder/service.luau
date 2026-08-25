@@ -240,7 +240,9 @@ local function launchRecorder(windowArg)
 
   -- 文件模式先确保目录存在（§2）
   local function doLaunch()
-    local ok = noctalia.runStream({ "bash", "-c", buildWrapper(args) }, handleGsrLine)
+    -- runStream 仅接受字符串命令（argv 表形式仅 runAsync 支持）；
+    -- wrapper 含用户字符串，经 shQuote 安全嵌入 bash -c
+    local ok = noctalia.runStream("bash -c " .. shQuote(buildWrapper(args)), handleGsrLine)
     if not ok then
       prelaunch = false
       starting = false
