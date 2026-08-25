@@ -7,8 +7,8 @@
 -- 停止后以 setColor("") 恢复默认胶囊配色（udiskie 插件同款用法）。
 --
 -- 两态：
---   idle      circle 图标（默认前景色）+ 无文本 + 默认胶囊；低频兜底重渲染。
---   recording error 色胶囊 + 计时文本（on_error 色）+ 麦克风/circle 图标；
+--   idle      circle 图标（on_surface 前景）+ 无文本 + 默认胶囊；低频兜底重渲染。
+--   recording error 色胶囊 + 计时文本（on_error 前景）+ 图标区分：mic/both→microphone、desktop→speaker、none→circle；
 --             setUpdateInterval(1000) 驱动秒级计时刷新。
 
 local state = noctalia.state
@@ -72,15 +72,21 @@ end
 local function refresh()
   if isRecording() then
     local a = audioSource()
-    local hasAudio = a ~= "" and a ~= "none"
-    -- 有音频 → 麦克风图标；否则保留 circle 作录制指示点（静态，不闪烁）
-    barWidget.setGlyph(hasAudio and "microphone" or "circle")
-    barWidget.setGlyphColor("on_error")
+    -- 与 panel 保持一致的音频图标语义：mic/both→microphone、desktop→speaker、none→circle
+    -- 避免桌面音频录制时误显示麦克风图标
+    local glyphName = "circle"
+    if a == "mic" or a == "both" then
+      glyphName = "microphone"
+    elseif a == "desktop" then
+      glyphName = "speaker"
+    end
+    barWidget.setGlyph(glyphName)
+    barWidget.setGlyphColor("on_error") -- error 背景上的前景必须用 on_error，保证明/暗主题对比度
     barWidget.setText(formatElapsed(elapsedSeconds()))
     barWidget.setColor("error") -- 录制态：红色胶囊本体
   else
     barWidget.setGlyph("circle")
-    barWidget.setGlyphColor("on_surface_variant")
+    barWidget.setGlyphColor("on_surface") -- idle 胶囊为默认 surface 背景，用 on_surface 比 on_surface_variant 对比度更高，明/暗主题均可见
     barWidget.setText("")
     barWidget.setColor("") -- 停止后恢复默认胶囊配色
   end
