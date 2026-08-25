@@ -1,6 +1,6 @@
 id = "bighu630/nc-screen-recorder"
 name = "Screen Recorder"
-version = "2.1.1"
+version = "2.1.2"
 plugin_api = 26
 author = "Bighu630"
 license = "MIT"

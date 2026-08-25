@@ -20,7 +20,7 @@
     {
       "id": "bighu630/nc-screen-recorder",
       "name": "Screen Recorder",
-      "version": "2.1.1",
+      "version": "2.1.2",
       "official": false,
       "author": "Bighu630",
       "description": "Screen recording and streaming powered by gpu-screen-recorder, with slurp-based region selection.",
@@ -32,7 +32,7 @@
         "Panel",
         "Utility"
       ],
-      "lastUpdated": "2026-08-25T10:22:11+08:00"
+      "lastUpdated": "2026-08-25T15:42:33+08:00"
     },
     {
       "id": "bighu630/global-menu",
