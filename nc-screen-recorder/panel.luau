@@ -93,7 +93,7 @@ local function selectRow(props)
       options = props.labels,
       selectedIndex = selectedIndex,
       enabled = props.enabled,
-      controlSize = "md",
+      controlSize = "sm", -- 紧凑高度（用户反馈：下拉偏高）
       flexGrow = 1, -- 占满面板内容宽，所有下拉左右边缘对齐
       onChange = function(index, _label)
         local v = props.values[(math.floor(tonumber(index) or -1)) + 1]
