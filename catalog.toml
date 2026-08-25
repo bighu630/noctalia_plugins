@@ -29,8 +29,8 @@ tags = ["bar", "utility"]
 [[plugin]]
 id = "bighu630/nc-screen-recorder"
 name = "Screen Recorder"
-version = "2.1.3"
-updated_at = 1787644471
+version = "2.1.4"
+updated_at = 1787644764
 added_at = 1787575659
 author = "Bighu630"
 license = "MIT"
