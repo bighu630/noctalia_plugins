@@ -1,9 +1,9 @@
 --!nonstrict
--- nc-screen-recorder v5 下拉面板：状态行 / 开始停止大按钮 / 6 个下拉 / 设置入口。
+-- nc-screen-recorder v5 下拉面板：状态行 / 开始停止大按钮 / 7 个下拉 / 设置入口。
 --
 -- 渲染机制：onOpen(context) 里 panel.render(ui树) 推送全树；watch rec_state/rec_options
--- 变化即重渲染；录制中 panel.setWantsSecondTicks(true) 让 update() 每秒触发刷新计时，
--- 面板关闭时 tick 自动停止（onClose 再显式取消一次）。
+-- 变化即重渲染。状态行不展示计时，无需秒级 tick（setWantsSecondTicks 始终为 false，
+-- onClose 再显式取消一次）。
 --
 -- 契约要点：
 --   * rec_cmd 的值必须是 JSON 字符串（noctalia.json.encode 后 state.set）。
@@ -37,6 +37,7 @@ local function isRecording()
   return recState ~= nil and recState.isRecording == true
 end
 
+-- 保留计时辅助函数供参考（面板已不展示计时，仅 widget 状态栏计时）
 -- <1h → m:ss；≥1h → h:mm:ss（与 widget 一致）
 local function formatElapsed(sec)
   sec = math.max(0, math.floor(tonumber(sec) or 0))
@@ -180,7 +181,7 @@ local function settingsButton()
   })
 end
 
--- 六个下拉（录制中禁用）：音频源 / 录制目标 / 编码器 / 质量 / 帧率 / 推流到
+-- 七个下拉（录制中禁用）：音频源 / 录制目标 / 编码器 / 质量 / 帧率 / 格式 / 推流到
 local function buildSelects(recording)
   local rows = {}
 
@@ -277,13 +278,12 @@ local function buildTree()
   local selects = buildSelects(recording)
   local settingsBtn = settingsButton()
 
-  -- 状态行（仅录制中显示）：红点(error 色) + 「录制中」+ 计时 + 音频图标(mic/speaker)
+  -- 状态行（仅录制中显示）：红点(error 色) + 「录制中」+ 音频图标(mic/speaker)，不展示计时
   if recording then
     local a = optionValue("audioSource", "none")
     local statusChildren = {
       ui.label({ text = "●", color = ERROR_COLOR, fontSize = 14 }),
       ui.label({ text = noctalia.tr("panel.recording"), color = ERROR_COLOR, fontWeight = "bold" }),
-      ui.label({ text = formatElapsed(elapsedSeconds()), color = ERROR_COLOR }),
     }
     if a == "mic" or a == "both" then
       statusChildren[#statusChildren + 1] = ui.glyph({ name = "microphone", color = ERROR_COLOR, size = 14 })
@@ -329,13 +329,12 @@ end
 
 local function refresh()
   panel.render(buildTree())
-  -- 录制中请求秒级 tick 驱动 update() 刷新计时（面板关闭时宿主自动停止，onClose 再显式关一次）
-  panel.setWantsSecondTicks(isRecording())
+  -- 面板不再显示计时，无需秒级 tick；状态变化时重渲染即可
+  panel.setWantsSecondTicks(false)
 end
 
 function update()
-  -- 仅在录制中被 setWantsSecondTicks 触发；重渲染即可更新计时文本
-  refresh()
+  -- 面板不再显示计时，无秒级 tick；保留空操作以防宿主调用
 end
 
 function onOpen(context)

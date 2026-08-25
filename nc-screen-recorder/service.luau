@@ -25,14 +25,14 @@ local DEFAULTS = {
   quality = "high",            -- medium | high | very_high | ultra
   framerate = "60",
   streamDestination = "",
+  videoFormat = "mp4",
   -- 文件模式相关（不进 rec_options 快照，但同样走三级解析）
   saveDirectory = "~/Videos",
   filePattern = "recording_{datetime}",
-  videoFormat = "mp4",
 }
 
--- rec_options 快照广播的键（契约 §1 固定集合）
-local OPTION_KEYS = { "audioSource", "target", "codec", "quality", "framerate", "streamDestination" }
+-- rec_options 快照广播的键（契约 §1 固定集合，含 videoFormat 以同步面板显式选择）
+local OPTION_KEYS = { "audioSource", "target", "codec", "quality", "framerate", "streamDestination", "videoFormat" }
 
 -- 进程内状态
 local recActive = false          -- 已确认 pid、处于录制中
