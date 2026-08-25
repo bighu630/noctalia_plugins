@@ -1,6 +1,6 @@
 id = "bighu630/nc-screen-recorder"
 name = "Screen Recorder"
-version = "2.0.0"
+version = "2.1.0"
 plugin_api = 26
 author = "Bighu630"
 license = "MIT"
@@ -20,7 +20,7 @@ entry = "widget.luau"
 id = "main"
 entry = "panel.luau"
 width = 380
-height = 430 -- 贴合内容：大按钮+7 个下拉行+设置按钮（录制态状态行也放得下）
+height = 430 # 贴合内容：大按钮 + 7 个下拉行 + 设置按钮（录制态状态行也放得下）
 placement = "attached"
 position = "auto"
 open_near_click = true
