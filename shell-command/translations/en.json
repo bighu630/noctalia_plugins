@@ -1,10 +1,17 @@
 {
+  "cd_empty": "No folders found",
+  "cd_empty_subtitle": "Type path or check workspace setting",
+  "cd_open_subtitle": "Opens terminal in this folder",
+  "cd_open_title": "Open in: {path}",
+  "hint_subtitle_background": "Type a command after /cmd and press Enter to run it in the background",
+  "hint_subtitle_terminal": "Type a command after /sh and press Enter to open it in your terminal",
   "hint_title": "Run a shell command",
-  "hint_subtitle": "Type a command after /cmd and press Enter to run it in the background",
   "history_subtitle": "Recent command",
   "run_start_failed": "Command failed to start",
-  "run_subtitle": "Runs in the background",
-  "run_subtitle_found": "{command} found — runs in the background",
+  "run_subtitle_background": "Runs in the background",
+  "run_subtitle_found_background": "{command} found — runs in the background",
+  "run_subtitle_found_terminal": "{command} found — opens in your default terminal",
+  "run_subtitle_terminal": "Opens in your default terminal",
   "run_title": "Run: {command}",
   "settings": {
     "default_workspace": {
@@ -12,7 +19,7 @@
       "label": "Default Workspace"
     },
     "snippets": {
-      "description": "Commands shown when /cmd is empty. Each entry is one command.",
+      "description": "Commands shown when /cmd or /sh is empty. Each entry is one command.",
       "label": "Snippets"
     }
   },

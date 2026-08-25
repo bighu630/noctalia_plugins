@@ -41,11 +41,11 @@ tags = ["bar", "panel", "utility"]
 [[plugin]]
 id = "bighu630/shell-command"
 name = "Shell Command"
-version = "0.3.0"
-updated_at = 1786801532
+version = "0.4.0"
+updated_at = 1787644004
 added_at = 1786799469
 author = "Bighu630"
 license = "MIT"
-description = "Run a shell command from the launcher in the background. Type /cmd then command."
-plugin_api = 14
+description = "Run shell commands from the launcher: /cmd runs them in the background, /sh opens your default terminal."
+plugin_api = 22
 tags = ["launcher", "utility"]

@@ -1,11 +1,11 @@
 id           = "bighu630/shell-command"
 name         = "Shell Command"
-version      = "0.3.0"
-plugin_api   = 14
+version      = "0.4.0"
+plugin_api   = 22
 author       = "Bighu630"
 license      = "MIT"
 icon         = "terminal"
-description  = "Run a shell command from the launcher in the background. Type /cmd then command."
+description  = "Run shell commands from the launcher: /cmd runs them in the background, /sh opens your default terminal."
 tags         = ["launcher", "productivity", "development"]
 dependencies = ["bash", "fish", "sh"]
 
@@ -24,9 +24,17 @@ label_key       = "settings.snippets.label"
 description_key = "settings.snippets.description"
 
 [[launcher_provider]]
-id                       = "provider"
-entry                    = "shell_provider.luau"
+id                       = "cmd"
+entry                    = "cmd_provider.luau"
 prefix                   = "cmd"
+glyph                    = "terminal"
+include_in_global_search = false
+debounce_ms              = 150
+
+[[launcher_provider]]
+id                       = "sh"
+entry                    = "sh_provider.luau"
+prefix                   = "sh"
 glyph                    = "terminal"
 include_in_global_search = false
 debounce_ms              = 150

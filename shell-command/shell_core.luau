@@ -1,18 +1,25 @@
--- Shell Command launcher provider.
+-- Shell Command plugin — shared core.
 --
--- Type `/cmd <command>` in the launcher to run a shell command in the
--- background — no terminal window is opened. Fish-style autosuggestions: as
--- you type it queries the shell's own completion engine (`fish -c 'complete
--- -C "<query>"'`, falling back to bash `compgen -c`) so suggestions grow
--- dynamically with your system — no hardcoded list. Commands from your own
--- history and user-defined snippets are offered too. Selecting an entry
--- launches the command detached via `noctalia.runAsync` (fire-and-forget):
--- no output is captured and there is no exit-code feedback, but commands are
--- never time-limited and keep running after Noctalia exits.
+-- Two launcher providers share this module (see cmd_provider.luau and
+-- sh_provider.luau); each entry runs in its own VM and sets `mode` before
+-- querying:
+--   * "terminal"  — /sh <command>: opens a real terminal (noctalia.runInTerminal)
+--                   with live output, TUI apps and native history, plus a `cd`
+--                   folder-browser mode. This is the upstream behaviour.
+--   * "background" — /cmd <command>: runs detached via noctalia.runAsync
+--                   (fire-and-forget). No terminal, no captured output, no
+--                   exit-code feedback; processes are never time-limited and
+--                   survive Noctalia.
+--
+-- Both modes share completion (fish complete -C, falling back to bash
+-- compgen -c), pointer into the same on-disk history/snippets, and honour
+-- `cd <dir> && <cmd>` compounds and the default_workspace setting.
 
 local HISTORY_FILE = "history"
 local HISTORY_LIMIT = 100
 local MAX_SUGGESTIONS = 8
+
+local M = { mode = "background" }
 
 local history = {}
 
@@ -22,6 +29,11 @@ end
 
 local function trim(s)
 	return noctalia.string.trim(tostring(s or ""))
+end
+
+-- Mode-suffixed translation key, e.g. hint_subtitle_terminal/background.
+local function mt(key)
+	return key .. "_" .. M.mode
 end
 
 -- Private per-plugin storage (XDG state); the host creates the directory on
@@ -64,8 +76,12 @@ local function saveHistory()
 	end
 end
 
--- Record a run command: move it to the front (most recent), dedupe, cap size.
+-- Record a run command: refresh from disk first (the two provider VMs share
+-- the same history file, so reload before mutating avoids clobbering runs
+-- tracked by the other mode), then move it to the front (most recent), dedupe,
+-- cap size and persist.
 local function recordHistory(cmd)
+	loadHistory()
 	for i, entry in ipairs(history) do
 		if entry == cmd then
 			table.remove(history, i)
@@ -81,24 +97,44 @@ local function recordHistory(cmd)
 	saveHistory()
 end
 
--- Wrap a command in the background wrapper and run it via the user's own
--- interactive shell (`$SHELL -ic`) so aliases and functions from the
+-- Wrap a command in the terminal-held-open wrapper and run it via the user's
+-- own interactive shell (`$SHELL -ic`) so aliases and functions from the
 -- login/rc config are available — a bare `-c` ignores them and breaks things
--- like fish aliases. No terminal is involved: noctalia.runAsync detaches the
--- process (double-fork) and never time-limits it. An interactive `-i` shell
--- without a tty may print a harmless job-control warning to stderr, which is
--- discarded together with all other output.
+-- like fish aliases. After the command we `exec $SHELL` into a fresh
+-- interactive shell. Terminal mode only.
+local function buildLaunch(inner)
+	local shell = noctalia.getenv("SHELL") or "sh"
+	-- `-ic`: user's rc config/aliases load. Alias-safe `read` (fish shows an
+	-- ugly `read>` prompt interactively — use the silent `-s`/`-l` variant; bash
+	-- and zsh `read` are silent already and have no such prompt) holds the
+	-- output until Enter, then we exec a fresh interactive shell that stays open.
+	local base = shell:match("([^/]+)$") or "sh"
+	local readCmd = (base == "fish") and "read -l -s __x" or "read __x"
+	local printfPrompt = "printf '%s\\n' '[Press Enter to continue]  [Ctrl+C to Close]'"
+	return shell .. " -ic " .. shellQuote(inner .. "; " .. printfPrompt .. "; " .. readCmd .. "; exec $SHELL")
+end
+
+-- Background wrapper: still `$SHELL -ic` for aliases/functions, but no
+-- terminal tricks. noctalia.runAsync detaches the process (double-fork) and
+-- never time-limits it. An interactive `-i` shell without a tty may print a
+-- harmless job-control warning to stderr, which is discarded with all output.
 local function buildBackground(inner)
 	local shell = noctalia.getenv("SHELL") or "sh"
 	return shell .. " -ic " .. shellQuote(inner)
+end
+
+-- Open a terminal directly inside a chosen directory (no command to run).
+local function buildCdCommand(path)
+	return buildLaunch("cd " .. shellQuote(path))
 end
 
 -- Build the command actually launched.
 --
 -- If the query itself is a `cd <dir> && <cmd>` compound, we cd into `<dir>`
 -- instead of the workspace — that way navigation and a command can be combined
--- in one launch (`/cmd cd ~/proj && ls`). Otherwise, if a default workspace is
--- configured, cd there first.
+-- in one launch (`/cmd cd ~/proj && ls`, `/sh cd ~/proj && ls`). Otherwise, if
+-- a default workspace is configured, cd there first. The wrapper depends on
+-- the active mode.
 local function buildCommand(cmd)
 	local inner = cmd
 	-- Try to split a leading `cd <path> && <rest>` compound, honouring quoted
@@ -146,6 +182,9 @@ local function buildCommand(cmd)
 		if type(cwd) == "string" and cwd ~= "" then
 			inner = "cd " .. shellQuote(cwd) .. " && " .. cmd
 		end
+	end
+	if M.mode == "terminal" then
+		return buildLaunch(inner)
 	end
 	return buildBackground(inner)
 end
@@ -220,9 +259,62 @@ local function fetchCompletions(query, callback)
 	callback({})
 end
 
+-- List subdirectories of the cd root (default workspace, else $HOME) so the
+-- user can open a terminal inside a chosen folder (terminal mode only). Uses
+-- `noctalia.listDir` and filesystem info rather than `find`. Expand leading ~
+-- and join a relative path onto the workspace base. Returns an absolute path.
+local function resolvePath(p)
+	local base = noctalia.getConfig("default_workspace")
+	if type(base) ~= "string" or base == "" then
+		base = noctalia.getenv("HOME") or "/"
+	end
+	if type(p) ~= "string" or (p:match("^%s*$")) then
+		return base
+	end
+	p = p:gsub("^~/+", (noctalia.getenv("HOME") or "/") .. "/")
+	if p:sub(1, 1) ~= "/" then
+		p = base .. "/" .. p:gsub("^/+", "")
+	end
+	return p
+end
+
+-- List subdirectories to navigate into, breadcrumb-style (terminal mode only).
+local function listDirs(query)
+	local pathPart = query:match("^cd%s*(.*)$") or ""
+
+	local parent, prefix
+	if pathPart == "" then
+		parent, prefix = resolvePath(""), ""
+	elseif pathPart:match("[/]$") then
+		parent, prefix = resolvePath(pathPart), ""
+	else
+		local slash = pathPart:match("^.*/")
+		if slash then
+			local base2 = resolvePath(slash:gsub("/$", ""))
+			parent = base2
+			prefix = pathPart:sub(#slash + 1):gsub("^%s", "")
+		else
+			parent, prefix = resolvePath(""), pathPart
+		end
+	end
+
+	local dirs = {}
+	local names = noctalia.listDir(parent) or {}
+	table.sort(names)
+	for _, name in ipairs(names) do
+		if name ~= "." and name ~= ".." and (prefix == "" or name:sub(1, #prefix) == prefix) then
+			local info = noctalia.fileInfo(parent .. "/" .. name)
+			if info and info.isDir then
+				dirs[#dirs + 1] = { path = parent .. "/" .. name, name = name }
+			end
+		end
+	end
+	return dirs, parent
+end
+
 local pendingQuery = nil
 
-function onQuery(query)
+function M.onQuery(query)
 	query = trim(query)
 	pendingQuery = query
 
@@ -232,7 +324,7 @@ function onQuery(query)
 			{
 				id = "",
 				title = noctalia.tr("hint_title"),
-				subtitle = noctalia.tr("hint_subtitle"),
+				subtitle = noctalia.tr(mt("hint_subtitle")),
 				glyph = "terminal",
 			},
 		}
@@ -262,10 +354,47 @@ function onQuery(query)
 		return
 	end
 
+	-- cd mode (terminal only): breadcrumb folder navigation. Folder rows fill
+	-- input with trailing-slash path (`fill:`) so Enter drills one level deeper
+	-- and can keep going. First "Open in:" row launches terminal directly in the
+	-- current parent dir (`cdgo:`). A `cd <path> && <cmd>` compound launches a
+	-- real command rather than folder navigation.
+	if M.mode == "terminal" then
+		local isCompound = query:match("^%s*cd%s+.+&&.+$")
+		if not isCompound and (query == "cd" or query:match("^cd%s")) then
+			local dirs, parent = listDirs(query)
+			local results = {}
+			results[#results + 1] = {
+				id = "cdgo:" .. parent,
+				title = noctalia.tr("cd_open_title", { path = parent }),
+				subtitle = noctalia.tr("cd_open_subtitle"),
+				glyph = "folder-open",
+			}
+			for _, dir in ipairs(dirs) do
+				results[#results + 1] = {
+					id = "fill:cd " .. dir.path .. "/",
+					title = dir.name,
+					subtitle = dir.path,
+					glyph = "folder",
+				}
+			end
+			if #dirs == 0 then
+				results[#results + 1] = {
+					id = "",
+					title = noctalia.tr("cd_empty"),
+					subtitle = noctalia.tr("cd_empty_subtitle"),
+					glyph = "folder",
+				}
+			end
+			launcher.setResults(query, results)
+			return
+		end
+	end
+
 	local token = firstToken(query)
-	local subtitle = noctalia.tr("run_subtitle")
+	local subtitle = noctalia.tr(mt("run_subtitle"))
 	if token ~= "" and noctalia.commandExists(token) then
-		subtitle = noctalia.tr("run_subtitle_found", { command = token })
+		subtitle = noctalia.tr(mt("run_subtitle_found"), { command = token })
 	end
 
 	-- Show the exact command immediately, then fill in suggestions async.
@@ -327,7 +456,7 @@ function onQuery(query)
 	end)
 end
 
-function onActivate(id)
+function M.onActivate(id)
 	if id == "" then
 		return
 	end
@@ -341,16 +470,31 @@ function onActivate(id)
 	if kind == "fill" then
 		launcher.setQuery(value)
 	elseif kind == "run" then
-		local ok = noctalia.runAsync(buildCommand(value))
-		if ok then
+		if M.mode == "terminal" then
 			recordHistory(value)
+			noctalia.runInTerminal(buildCommand(value))
 		else
-			-- Launch rejected (e.g. global async command limit reached).
-			noctalia.notifyError(noctalia.tr("run_start_failed"), value)
+			local ok = noctalia.runAsync(buildCommand(value))
+			if ok then
+				recordHistory(value)
+			else
+				-- Launch rejected (e.g. global async command limit reached).
+				noctalia.notifyError(noctalia.tr("run_start_failed"), value)
+			end
 		end
+	elseif kind == "cdgo" and M.mode == "terminal" then
+		noctalia.runInTerminal(buildCdCommand(value))
 	else
 		noctalia.log("shell-command: unknown activation kind: " .. kind)
 	end
 end
 
+-- Load history up front so the first `onQuery` already sees recent commands
+-- (empty-query listing and history-ranked suggestions). recordHistory() also
+-- reloads before writing: the two provider VMs share this file, and a
+-- read-modify-write after a fresh read is a best-effort guard against one
+-- mode clobbering a run recorded by the other (the window is tiny and there
+-- is no per-VM file-lock API).
 loadHistory()
+
+return M

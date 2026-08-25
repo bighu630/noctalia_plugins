@@ -1,10 +1,17 @@
 {
+  "cd_empty": "未找到文件夹",
+  "cd_empty_subtitle": "输入路径或检查工作区设置",
+  "cd_open_subtitle": "在此文件夹中打开终端",
+  "cd_open_title": "打开：{path}",
+  "hint_subtitle_background": "在 /cmd 后输入命令并按回车，将在后台执行",
+  "hint_subtitle_terminal": "在 /sh 后输入命令并按回车，将在终端中打开",
   "hint_title": "运行 shell 命令",
-  "hint_subtitle": "在 /cmd 后输入命令并按回车，将在后台执行",
   "history_subtitle": "最近命令",
   "run_start_failed": "命令启动失败",
-  "run_subtitle": "后台执行",
-  "run_subtitle_found": "已找到 {command} — 后台执行",
+  "run_subtitle_background": "后台执行",
+  "run_subtitle_found_background": "已找到 {command} — 后台执行",
+  "run_subtitle_found_terminal": "已找到 {command} — 在默认终端中打开",
+  "run_subtitle_terminal": "在默认终端中打开",
   "run_title": "运行：{command}",
   "settings": {
     "default_workspace": {
@@ -12,7 +19,7 @@
       "label": "默认工作目录"
     },
     "snippets": {
-      "description": "/cmd 为空时显示的命令。每项一条命令。",
+      "description": "/cmd 或 /sh 为空时显示的命令。每项一条命令。",
       "label": "命令片段"
     }
   },

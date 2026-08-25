@@ -53,18 +53,18 @@
     {
       "id": "bighu630/shell-command",
       "name": "Shell Command",
-      "version": "0.3.0",
+      "version": "0.4.0",
       "official": false,
       "author": "Bighu630",
-      "description": "Run a shell command from the launcher in the background. Type /cmd then command.",
+      "description": "Run shell commands from the launcher: /cmd runs them in the background, /sh opens your default terminal.",
       "repository": "https://github.com/bighu630/noctalia_plugins",
       "license": "MIT",
-      "plugin_api": 14,
+      "plugin_api": 22,
       "tags": [
         "Launcher",
         "Utility"
       ],
-      "lastUpdated": "2026-08-15T21:45:32+08:00"
+      "lastUpdated": "2026-08-25T15:46:44+08:00"
     }
   ]
 }
