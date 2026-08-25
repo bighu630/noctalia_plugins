@@ -300,6 +300,7 @@ local function buildTree()
       flexGrow = 1,
       onClick = function()
         sendCmd({ op = "start" })
+        panel.close() -- 点击开始后自动收起面板（选区/录制无需面板停留）
       end,
     }),
     selects,

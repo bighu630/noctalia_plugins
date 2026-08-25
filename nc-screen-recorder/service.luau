@@ -286,10 +286,12 @@ local function startRecording(cmd)
   local target = tostring(cmd.target or effective("target") or DEFAULTS.target)
 
   if target == "region" then
-    -- slurp 选区：空输出 / 非零退出 → 视为取消（非错误）
+    -- slurp 选区：空输出 / 非零退出 → 视为取消（非错误）。
+    -- 第三参显式给长超时（120s）：runAsync 默认超时会在用户还在拖框选区时
+    -- 杀掉 slurp，表现为「选到一半被取消」。
     noctalia.runAsync({ "slurp", "-f", "%wx%h+%x+%y" }, function(result)
       local geom = result and trim(result.stdout) or ""
-      if not result or result.exitCode ~= 0 or geom == "" then
+      if not result or result.timedOut or result.exitCode ~= 0 or geom == "" then
         prelaunch = false
         starting = false
         pendingStop = false -- 复位：slurp 期间取消不应把停止请求残留到下次启动（复审建议）
@@ -297,7 +299,7 @@ local function startRecording(cmd)
         return
       end
       launchRecorder(geom)
-    end)
+    end, 120000) -- 选区超时 120s，可按需调大
     return
   end
 
