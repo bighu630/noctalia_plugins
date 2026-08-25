@@ -43,7 +43,8 @@
       "options": {
         "mp4": "MP4",
         "mkv": "MKV",
-        "webm": "WebM"
+        "webm": "WebM",
+        "gif": "GIF"
       }
     },
     "codec": {
@@ -111,6 +112,8 @@
     "streamingStopped": "Streaming stopped",
     "regionSelectionCancelled": "Region selection cancelled",
     "startFailed": "Failed to start recording",
-    "notRecording": "Not recording"
+    "notRecording": "Not recording",
+    "convertingToGif": "Converting to GIF…",
+    "gifConvertFailed": "GIF conversion failed; the original recording was kept"
   }
 }

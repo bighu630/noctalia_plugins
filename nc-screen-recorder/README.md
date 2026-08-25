@@ -15,6 +15,8 @@ Noctalia v5 plugin for screen recording and streaming, powered by
 - `slurp` — interactive region selection (`slurp -f "%wx%h+%x+%y"`, output is
   fed directly to gpu-screen-recorder's `-region WxH+X+Y`, no coordinate
   conversion needed)
+- `ffmpeg` — GIF post-conversion (two-pass palette pipeline) for the `gif`
+  video format
 
 ## Architecture
 
@@ -41,7 +43,7 @@ cleaned up back to idle.
 |---|---|---|---|
 | `saveDirectory` | folder | `~/Videos` | Folder where recordings are saved |
 | `filePattern` | string | `recording_{datetime}` | Output file name pattern; `{datetime}` expands to a timestamp |
-| `videoFormat` | select (`mp4`/`mkv`/`webm`) | `mp4` | Container format |
+| `videoFormat` | select (`mp4`/`mkv`/`webm`/`gif`) | `mp4` | Container format; with `gif`, the recording is first written to a temporary `.mp4` (gpu-screen-recorder has no gif container), then converted to the final `.gif` via ffmpeg's two-pass palettegen/paletteuse filter after recording stops — the intermediate mp4 is deleted on success and kept on conversion failure |
 | `codec` | select (`auto`/`h264`/`hevc`/`av1`/`vp9`) | `auto` | Video codec |
 | `quality` | select (`medium`/`high`/`very_high`/`ultra`) | `high` | Quality preset |
 | `framerate` | select (`30`/`60`/`120`/`144`) | `60` | Recording FPS |

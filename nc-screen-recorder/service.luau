@@ -42,6 +42,9 @@ local pendingStop = false        -- starting 态下收到停止请求、pidfile 
 local launchTime = 0             -- 启动时间戳（用于 pid 确认超时）
 local PID_CONFIRM_TIMEOUT_MS = 10000
 local session = { startTime = 0, file = "", streaming = false }
+-- GIF 后处理挂起项：fmt=="gif" 时先录 <name>.mp4，结束后经 ffmpeg 调色板管线
+-- 转成 <name>.gif。{ tmp=中间mp4路径, final=最终gif路径 }；仅文件模式非空。
+local gifPending = nil
 
 -- ---------------------------------------------------------------- 工具函数
 
@@ -128,10 +131,29 @@ end
 
 -- ---------------------------------------------------------------- 收尾
 
+-- GIF 两遍调色板转换（后处理，不阻塞状态复位）：成功删中间 mp4 并发保存通知，
+-- 失败保留 mp4 以免丢录像。
+local function convertToGif(pending)
+  noctalia.notify(noctalia.tr("notification.convertingToGif"))
+  local cmd = "ffmpeg -y -v error -i " .. shQuote(pending.tmp)
+    .. " -vf \"fps=12,split[s0][s1];[s0]palettegen[p];[s1][p]paletteuse\" -loop 0 "
+    .. shQuote(pending.final)
+  -- 长视频转换可能耗时较久：显式给 600s 超时（默认超时会中途杀掉 ffmpeg）
+  noctalia.runAsync("bash -c " .. shQuote(cmd), function(result)
+    if result and result.exitCode == 0 and not result.timedOut then
+      removeFilesAsync(pending.tmp)
+      noctalia.notify(noctalia.tr("notification.recordingSavedWithPath", { file = pending.final }))
+    else
+      noctalia.notifyError(noctalia.tr("notification.gifConvertFailed"))
+    end
+  end, 600000)
+end
+
 -- 退出码 0 / 255（SIGINT 优雅结束）视为成功；否则失败通知。
 local function finishRecording(exitCode)
   local wasStreaming = session.streaming
   local filePath = session.file
+  local pendingGif = gifPending
   starting = false
   recActive = false
   prelaunch = false -- 防泄漏（正常路径下已为 false）
@@ -144,11 +166,17 @@ local function finishRecording(exitCode)
     if wasStreaming then
       noctalia.notify(noctalia.tr("notification.streamingStopped"))
     elseif filePath ~= "" then
-      noctalia.notify(noctalia.tr("notification.recordingSavedWithPath", { file = filePath }))
+      if pendingGif and pendingGif.tmp and pendingGif.final then
+        convertToGif(pendingGif)
+      else
+        noctalia.notify(noctalia.tr("notification.recordingSavedWithPath", { file = filePath }))
+      end
     end
   else
     noctalia.notifyError(noctalia.tr("notification.recordingFailed", { code = tostring(exitCode) }))
   end
+  -- 无论成败均复位挂起项（转换回调持有局部引用，不受影响）
+  gifPending = nil
 end
 
 local function handleGsrLine(line)
@@ -236,6 +264,16 @@ local function launchRecorder(windowArg)
   -- 不再依赖 cmd.streaming，杜绝「选了推流目标仍走文件模式」。
   local streaming = streamUrl ~= ""
   local filePath = streaming and "" or buildFilePath()
+  -- GIF 模式：gsr 不支持 gif 容器，先录到同名 .mp4 临时文件，收尾后再转 .gif。
+  -- session/broadcast 始终面向最终 gif 路径，仅传给 gsr 的输出换成临时 mp4。
+  gifPending = nil
+  local finalFile = filePath
+  if not streaming and tostring(effective("videoFormat") or DEFAULTS.videoFormat) == "gif" then
+    local tmpFile = filePath:gsub("%.gif$", ".mp4")
+    gifPending = { tmp = tmpFile, final = filePath }
+    finalFile = filePath
+    filePath = tmpFile
+  end
   local args = buildGsrArgs(windowArg, streaming, filePath, streamUrl)
 
   -- 文件模式先确保目录存在（§2）
@@ -246,6 +284,7 @@ local function launchRecorder(windowArg)
     if not ok then
       prelaunch = false
       starting = false
+      gifPending = nil
       noctalia.notifyError(noctalia.tr("notification.startFailed"))
       return
     end
@@ -255,7 +294,7 @@ local function launchRecorder(windowArg)
     launchTime = nowMs()
     session = {
       startTime = nowMs(),
-      file = streaming and "" or filePath,
+      file = streaming and "" or finalFile,
       streaming = streaming,
     }
   end
@@ -267,6 +306,7 @@ local function launchRecorder(windowArg)
         prelaunch = false
         starting = false
         pendingStop = false
+        gifPending = nil
         noctalia.notifyError(noctalia.tr("notification.failedToCreateDirectory"))
         return
       end
@@ -450,6 +490,7 @@ function update()
       prelaunch = false
       starting = false
       pendingStop = false
+      gifPending = nil
       session = { startTime = 0, file = "", streaming = false }
       clearSessionFiles()
       broadcastIdle()

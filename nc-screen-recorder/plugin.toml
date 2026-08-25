@@ -6,7 +6,7 @@ author = "Bighu630"
 license = "MIT"
 description = "Screen recording and streaming powered by gpu-screen-recorder, with slurp-based region selection."
 tags = ["bar", "panel", "utility"]
-dependencies = ["gpu-screen-recorder", "slurp"]
+dependencies = ["gpu-screen-recorder", "slurp", "ffmpeg"]
 
 [[service]]
 id = "recorder_service"
@@ -49,7 +49,8 @@ dismiss_on_outside_click = true
   options = [
     { value = "mp4", label_key = "settings.videoFormat.options.mp4" },
     { value = "mkv", label_key = "settings.videoFormat.options.mkv" },
-    { value = "webm", label_key = "settings.videoFormat.options.webm" }
+    { value = "webm", label_key = "settings.videoFormat.options.webm" },
+    { value = "gif", label_key = "settings.videoFormat.options.gif" }
   ]
 
   [[setting]]

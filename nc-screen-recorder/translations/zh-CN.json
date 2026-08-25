@@ -43,7 +43,8 @@
       "options": {
         "mp4": "MP4",
         "mkv": "MKV",
-        "webm": "WebM"
+        "webm": "WebM",
+        "gif": "GIF"
       }
     },
     "codec": {
@@ -111,6 +112,8 @@
     "streamingStopped": "推流已停止",
     "regionSelectionCancelled": "已取消区域选择",
     "startFailed": "启动录制失败",
-    "notRecording": "当前没有正在进行的录制"
+    "notRecording": "当前没有正在进行的录制",
+    "convertingToGif": "正在转换为 GIF…",
+    "gifConvertFailed": "GIF 转换失败，已保留原始录像"
   }
 }
