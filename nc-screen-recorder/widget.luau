@@ -101,8 +101,18 @@ function onClick()
   noctalia.togglePanel(PANEL_ID)
 end
 
+-- 与 panel 同款命令通道：widget 直发停止命令（契约 §1，值必须为 JSON 字符串）
+local function sendStop()
+  state.set("rec_cmd", noctalia.json.encode({ op = "stop" }))
+end
+
 function onRightClick()
-  -- M1：优先调用宿主的 openSettings()（打开本插件设置页，plugin_api >= 15）；
+  -- 录制中 → 停止录制（SIGINT 优雅保存；插件无「暂停」语义，停止即收尾出片）
+  if isRecording() then
+    sendStop()
+    return
+  end
+  -- 未录制 → 打开设置：优先宿主 openSettings()（plugin_api >= 15），
   -- API 不存在或调用失败时回退为 togglePanel，保证右键始终有响应。
   local ok = false
   if noctalia.openSettings then ok = pcall(noctalia.openSettings) end
