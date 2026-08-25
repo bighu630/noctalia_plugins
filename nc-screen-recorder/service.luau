@@ -131,6 +131,23 @@ end
 
 -- ---------------------------------------------------------------- 收尾
 
+local function showSavedNotification(filePath)
+  local dir = filePath:match("^(.*)/[^/]+$") or "."
+  local title = noctalia.tr("notification.recordingSaved")
+  local body = filePath
+  local openLabel = noctalia.tr("notification.openFolder")
+  noctalia.runAsync({"notify-send", "-a", "nc-screen-recorder", "-i", "video-display", "-t", "10000", "-A", "openFolder=" .. openLabel, title, body}, function(result)
+    local out = result and result.stdout or ""
+    if out:match("openFolder") then
+      noctalia.runAsync({"xdg-open", dir})
+      return
+    end
+    if not result or result.exitCode ~= 0 then
+      noctalia.notify(noctalia.tr("notification.recordingSavedWithPath", { file = filePath }))
+    end
+  end)
+end
+
 -- GIF 两遍调色板转换（后处理，不阻塞状态复位）：成功删中间 mp4 并发保存通知，
 -- 失败保留 mp4 以免丢录像。
 local function convertToGif(pending)
@@ -142,7 +159,7 @@ local function convertToGif(pending)
   noctalia.runAsync("bash -c " .. shQuote(cmd), function(result)
     if result and result.exitCode == 0 and not result.timedOut then
       removeFilesAsync(pending.tmp)
-      noctalia.notify(noctalia.tr("notification.recordingSavedWithPath", { file = pending.final }))
+      showSavedNotification(pending.final)
     else
       noctalia.notifyError(noctalia.tr("notification.gifConvertFailed"))
     end
@@ -169,7 +186,7 @@ local function finishRecording(exitCode)
       if pendingGif and pendingGif.tmp and pendingGif.final then
         convertToGif(pendingGif)
       else
-        noctalia.notify(noctalia.tr("notification.recordingSavedWithPath", { file = filePath }))
+        showSavedNotification(filePath)
       end
     end
   else
